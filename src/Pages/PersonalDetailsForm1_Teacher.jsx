@@ -4,49 +4,36 @@ import { teacherService } from '../services/teacherService';
 
 // Helper function to ensure userId is stored persistently
 function ensureUserIdPersistence() {
-  // Try to get from localStorage first
   let userId = localStorage.getItem('user_id');
-  
-  // If found in localStorage, use it
   if (userId) {
     return userId;
   }
 
-  // Try to extract from user_data in localStorage
   const userData = localStorage.getItem('user_data');
   if (userData) {
     try {
       const parsedUserData = JSON.parse(userData);
       if (parsedUserData && parsedUserData.id) {
         userId = parsedUserData.id;
-        
-        // Save to localStorage for future use
         localStorage.setItem('user_id', userId);
         console.log('Saved user_id to localStorage from user_data:', userId);
-        
         return userId;
       }
     } catch (e) {
       console.error('Error parsing user_data:', e);
     }
   }
-  
-  // Try session storage as fallback
+
   userId = sessionStorage.getItem('user_id');
   if (userId) {
-    // Save to localStorage for persistence
     localStorage.setItem('user_id', userId);
     console.log('Saved user_id to localStorage from sessionStorage:', userId);
-    
     return userId;
   }
-  
-  // Additional fallback - check for any auth token which might be related
+
   const authToken = localStorage.getItem('auth_token');
   if (authToken) {
-    // If there's a JWT token, try to decode it to get user info
     try {
-      // Extract payload from JWT (middle part between dots)
       const base64Url = authToken.split('.')[1];
       if (base64Url) {
         const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -57,11 +44,8 @@ function ensureUserIdPersistence() {
         const payload = JSON.parse(jsonPayload);
         if (payload && payload.user_id) {
           userId = payload.user_id;
-          
-          // Save to localStorage
           localStorage.setItem('user_id', userId);
           console.log('Saved user_id to localStorage from auth token:', userId);
-          
           return userId;
         }
       }
@@ -69,7 +53,7 @@ function ensureUserIdPersistence() {
       console.error('Error decoding auth token:', e);
     }
   }
-  
+
   console.warn('Could not find user_id in any storage location');
   return null;
 }
@@ -95,22 +79,25 @@ const PersonalDetailsForm = () => {
   const [apiErrorDetails, setApiErrorDetails] = useState(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [useSameMobile, setUseSameMobile] = useState(false);
+  const [aadharPreview, setAadharPreview] = useState(null);
+  const [profilePreview, setProfilePreview] = useState(null);
+  const [fileSizeError, setFileSizeError] = useState({
+    aadharPhoto: '',
+    profilePhoto: ''
+  });
+  const [showPreview, setShowPreview] = useState({ aadhar: false, profile: false });
 
-  // Function to get current location
   const fetchCurrentLocation = () => {
     setIsGettingLocation(true);
-    
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          
           setFormData(prev => ({
             ...prev,
             latitude: latitude.toFixed(6),
             longitude: longitude.toFixed(6)
           }));
-          
           console.log(`Location obtained: ${latitude}, ${longitude}`);
           setIsGettingLocation(false);
         },
@@ -137,51 +124,40 @@ const PersonalDetailsForm = () => {
     }
   };
 
-  // Load saved data on component mount with improved user auth checking
   useEffect(() => {
-    // Ensure user ID persistence immediately on component mount
     const userId = ensureUserIdPersistence();
-    
     if (userId) {
       console.log('User ID confirmed in localStorage:', userId);
     } else {
       console.warn('No user ID could be found or extracted');
     }
-    
-    // Load saved form data if available
+
     const savedData = localStorage.getItem('personaldetails');
     if (savedData) {
       setFormData(JSON.parse(savedData));
     }
-    
-    // More thorough authentication check
+
     const checkUserAuth = () => {
       const userId = localStorage.getItem('user_id');
       const authToken = localStorage.getItem('auth_token');
-      
       console.log('Auth Check:', {
         userId: userId,
         hasAuthToken: !!authToken
       });
-      
       if (!userId && !authToken) {
         console.warn('No user_id or auth_token found. User might not be logged in.');
         console.log('Redirecting to login page...');
         navigate('/');
       }
     };
-    
+
     checkUserAuth();
-    
-    // Auto-fetch location when component mounts
     fetchCurrentLocation();
   }, [navigate]);
 
-  // Handle checkbox change for alternate number
   const handleSameMobileCheckbox = (e) => {
     const isChecked = e.target.checked;
     setUseSameMobile(isChecked);
-    
     if (isChecked) {
       setFormData(prev => ({
         ...prev,
@@ -229,19 +205,31 @@ const PersonalDetailsForm = () => {
 
     if (!formData.dateOfBirth) {
       newErrors.dateOfBirth = 'Date of birth is required';
+    } else {
+      const today = new Date().toISOString().split('T')[0];
+      if (formData.dateOfBirth > today) {
+        newErrors.dateOfBirth = 'Date of birth cannot be a future date';
+      }
     }
 
     if (!formData.address) {
       newErrors.address = 'Address is required';
     }
 
-    // Latitude and longitude are optional, but if provided must be valid
     if (formData.latitude && !/^-?([0-8]?[0-9]|90)(\.[0-9]{1,8})?$/.test(formData.latitude)) {
       newErrors.latitude = 'Invalid latitude format (must be between -90 and 90)';
     }
     
     if (formData.longitude && !/^-?((1?[0-7]?|[0-9]?)[0-9]|180)(\.[0-9]{1,8})?$/.test(formData.longitude)) {
       newErrors.longitude = 'Invalid longitude format (must be between -180 and 180)';
+    }
+
+    if (fileSizeError.aadharPhoto) {
+      newErrors.aadharPhoto = fileSizeError.aadharPhoto;
+    }
+    
+    if (fileSizeError.profilePhoto) {
+      newErrors.profilePhoto = fileSizeError.profilePhoto;
     }
 
     setErrors(newErrors);
@@ -252,17 +240,39 @@ const PersonalDetailsForm = () => {
     const { name, value, type, files } = e.target;
     
     if (type === 'file') {
-      setFormData(prev => ({
-        ...prev,
-        [name]: files[0]  // Store the actual File object, not just the path
-      }));
+      if (files[0]) {
+        if (files[0].size > 512000) {
+          setFileSizeError(prev => ({
+            ...prev,
+            [name]: 'File size must be less than 500KB'
+          }));
+          return;
+        } else {
+          setFileSizeError(prev => ({
+            ...prev,
+            [name]: ''
+          }));
+        }
+        
+        const previewUrl = URL.createObjectURL(files[0]);
+        
+        if (name === 'aadharPhoto') {
+          setAadharPreview(previewUrl);
+        } else if (name === 'profilePhoto') {
+          setProfilePreview(previewUrl);
+        }
+        
+        setFormData(prev => ({
+          ...prev,
+          [name]: files[0]
+        }));
+      }
     } else {
       setFormData(prev => ({
         ...prev,
         [name]: value
       }));
       
-      // If mobile number changes and useSameMobile is checked, update whatsapp number too
       if (name === 'mobileNumber' && useSameMobile) {
         setFormData(prev => ({
           ...prev,
@@ -281,7 +291,6 @@ const PersonalDetailsForm = () => {
 
   const handleNext = async () => {
     if (validateForm()) {
-      // Ensure user ID is available
       const userId = ensureUserIdPersistence();
       
       if (!userId) {
@@ -291,7 +300,6 @@ const PersonalDetailsForm = () => {
         return;
       }
       
-      // Save to localStorage for form persistence
       localStorage.setItem('personaldetails', JSON.stringify(formData));
       
       try {
@@ -301,11 +309,9 @@ const PersonalDetailsForm = () => {
         
         console.log('Submitting form with user_id:', userId);
         
-        // Submit to API
         const response = await teacherService.createTeacher(formData);
         console.log('API response:', response);
         
-        // If successful, store the teacher ID for future reference
         if (response.data && response.data.data && response.data.data.id) {
           localStorage.setItem('teacher_id', response.data.data.id);
           console.log('Saved teacher_id to localStorage:', response.data.data.id);
@@ -314,37 +320,30 @@ const PersonalDetailsForm = () => {
           console.log('Saved teacher_id to localStorage:', response.data.id);
         }
         
-        // Navigate to next step
         navigate('/details2');
       } catch (error) {
         console.error('Error submitting form:', error);
         
-        // Improved error handling to extract error_description
         let errorMessage = 'Failed to save your information. Please try again.';
         
-        // Check for various error response formats
         if (error.response) {
           console.log('API Error Response:', error.response.data);
           
-          // Check for error_description in various formats
           if (error.response.data?.error_description) {
             errorMessage = error.response.data.error_description;
           } else if (error.response.data?.message) {
             errorMessage = error.response.data.message;
           } else if (typeof error.response.data === 'string') {
             try {
-              // Try to parse if it's a JSON string
               const parsedError = JSON.parse(error.response.data);
               errorMessage = parsedError.error_description || parsedError.message || errorMessage;
             } catch (e) {
-              // If not JSON, use as is if it looks like an error message
               if (error.response.data.includes('error') || error.response.data.includes('fail')) {
                 errorMessage = error.response.data;
               }
             }
           }
           
-          // Store the detailed validation errors if available
           if (error.response.data?.errors) {
             setApiErrorDetails(error.response.data.errors);
           }
@@ -357,10 +356,22 @@ const PersonalDetailsForm = () => {
     }
   };
 
+  const handlePreview = (type) => {
+    setShowPreview(prev => ({ ...prev, [type]: true }));
+  };
+
+  const handleDelete = (type) => {
+    setFormData(prev => ({ ...prev, [type]: null }));
+    if (type === 'aadharPhoto') {
+      setAadharPreview(null);
+    } else if (type === 'profilePhoto') {
+      setProfilePreview(null);
+    }
+  };
+
   return (
     <div className="min-h-screen w-screen bg-indigo-100 flex flex-col">
-      {/* Header */}
-      <header className="bg-[#4527a0] text-black p-4 flex items-center" style={{height: '201px' }}>
+      <header className="bg-[#4527a0] text-black p-4 flex items-center fixed top-0 left-0 right-0 z-10" style={{height: '100px' }}>
         <img 
           src="/assets/LOGO (2).png" 
           alt="Star Educators Logo"
@@ -374,18 +385,16 @@ const PersonalDetailsForm = () => {
           onClick={() => navigate('/')}
         />
       </header>
-      {/* Form */}
-      <div className="flex-grow flex justify-center items-center">
-        <div className="w-full max-w-4xl bg-white p-8 rounded-lg shadow-md">
+      
+      <div className="flex-grow flex justify-center" style={{ marginTop: '450px', paddingBottom: '10px', overflow: 'auto' }}>
+        <div className="w-full max-w-4xl bg-white p-8 rounded-lg shadow-md my-8">
           <h1 className="text-3xl font-bold text-center mb-8 text-black">Personal Details</h1>
           
-          {/* API Error Messages - Updated to display error_description clearly */}
           {apiError && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
               <strong className="font-bold">Error: </strong>
               <span className="block sm:inline">{apiError}</span>
               
-              {/* Error Details */}
               {apiErrorDetails && (
                 <ul className="list-disc pl-5 mt-2">
                   {Object.entries(apiErrorDetails).map(([field, errors]) => (
@@ -398,7 +407,6 @@ const PersonalDetailsForm = () => {
             </div>
           )}
           
-          {/* Form Fields */}
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
@@ -514,7 +522,7 @@ const PersonalDetailsForm = () => {
                   type="file"
                   name="aadharPhoto"
                   onChange={handleInputChange}
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  accept=".jpg,.jpeg,.png"
                   className="hidden"
                   id="aadhar-input"
                 />
@@ -532,7 +540,27 @@ const PersonalDetailsForm = () => {
                 </label>
               </div>
               {errors.aadharPhoto && <p className="mt-1 text-sm text-red-500">{errors.aadharPhoto}</p>}
-              <p className="mt-1 text-xs text-black">* Upload scanned copy of your Aadhar Card</p>
+              {fileSizeError.aadharPhoto && <p className="mt-1 text-sm text-red-500">{fileSizeError.aadharPhoto}</p>}
+              <p className="mt-1 text-xs text-black">* Upload scanned copy of your Aadhar Card (max 500KB)</p>
+              
+              <div className="mt-2 flex space-x-2">
+                {aadharPreview && (
+                  <>
+                    <button
+                      className="px-4 py-2 bg-indigo-500 text-white rounded-md"
+                      onClick={() => handlePreview('aadhar')}
+                    >
+                      Preview
+                    </button>
+                    <button
+                      className="px-4 py-2 bg-red-500 text-white rounded-md"
+                      onClick={() => handleDelete('aadharPhoto')}
+                    >
+                      Delete
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-black">Profile Photo <span className="text-red-500">*</span></label>
@@ -541,7 +569,7 @@ const PersonalDetailsForm = () => {
                   type="file"
                   name="profilePhoto"
                   onChange={handleInputChange}
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  accept=".jpg,.jpeg,.png"
                   className="hidden"
                   id="profile-input"
                 />
@@ -559,9 +587,28 @@ const PersonalDetailsForm = () => {
                 </label>
               </div>
               {errors.profilePhoto && <p className="mt-1 text-sm text-red-500">{errors.profilePhoto}</p>}
-              <p className="mt-1 text-xs text-black">* Upload your Profile Photo</p>
+              {fileSizeError.profilePhoto && <p className="mt-1 text-sm text-red-500">{fileSizeError.profilePhoto}</p>}
+              <p className="mt-1 text-xs text-black">* Upload your Profile Photo (max 500KB)</p>
+              
+              <div className="mt-2 flex space-x-2">
+                {profilePreview && (
+                  <>
+                    <button
+                      className="px-4 py-2 bg-indigo-500 text-white rounded-md"
+                      onClick={() => handlePreview('profile')}
+                    >
+                      Preview
+                    </button>
+                    <button
+                      className="px-4 py-2 bg-red-500 text-white rounded-md"
+                      onClick={() => handleDelete('profilePhoto')}
+                    >
+                      Delete
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-            {/* Location Fields */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-black">Latitude</label>
@@ -595,7 +642,6 @@ const PersonalDetailsForm = () => {
               </div>
             </div>
             
-            {/* Location status message */}
             {isGettingLocation && (
               <div className="text-sm text-black flex items-center">
                 <svg className="animate-spin mr-2 h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -626,6 +672,34 @@ const PersonalDetailsForm = () => {
           </div>
         </div>
       </div>
+
+      {showPreview.aadhar && aadharPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+          <div className="bg-white p-4 rounded-md">
+            <img src={aadharPreview} alt="Aadhar Preview" className="max-h-80" />
+            <button
+              className="mt-4 px-4 py-2 bg-red-500 text-white rounded-md"
+              onClick={() => setShowPreview(prev => ({ ...prev, aadhar: false }))}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showPreview.profile && profilePreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+          <div className="bg-white p-4 rounded-md">
+            <img src={profilePreview} alt="Profile Preview" className="max-h-80" />
+            <button
+              className="mt-4 px-4 py-2 bg-red-500 text-white rounded-md"
+              onClick={() => setShowPreview(prev => ({ ...prev, profile: false }))}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

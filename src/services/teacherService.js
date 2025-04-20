@@ -53,7 +53,7 @@ export const teacherService = {
         "name": teacherData.name,
         "address": teacherData.address,
         "mobile_number": teacherData.mobileNumber,
-        "whatsapp_number": teacherData.alternateNumber || "",
+        "whatsapp_number": teacherData.whatsappNumber,
         "email": teacherData.email || `${teacherData.name.toLowerCase().replace(/\s+/g, '')}@example.com`,
         "gender": teacherData.gender,
         "date_of_birth": formattedDOB,

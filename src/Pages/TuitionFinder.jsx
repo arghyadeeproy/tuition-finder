@@ -110,7 +110,7 @@ const handlePostLoginRedirection = async () => {
     
     // Email/Phone validation
     if (!formData.emailOrPhone) {
-      newErrors.emailOrPhone = 'Email or phone is required';
+      newErrors.emailOrPhone = 'Email is required';
     } else if (formData.emailOrPhone.includes('@') && !/\S+@\S+\.\S+/.test(formData.emailOrPhone)) {
       newErrors.emailOrPhone = 'Please enter a valid email address';
     } else if (!formData.emailOrPhone.includes('@') && !/^\d{10}$/.test(formData.emailOrPhone)) {
