@@ -29,66 +29,63 @@ const CombinedAuthForm = () => {
   }, []);
 
   // Handle redirection after successful login
- // Handle redirection after successful login
-// Handle redirection after successful login
-// Handle redirection after successful login
-const handlePostLoginRedirection = async () => {
-  try {
-    setIsLoading(true);
-    // Get the user's role and ID from localStorage
-    const userDetails = JSON.parse(localStorage.getItem('personaldetails') || '{}');
-    const roleId = parseInt(localStorage.getItem('role_id'));
-    const teacherId = parseInt(localStorage.getItem('teacher_id'));
-    
-    // If user is a teacher (role_id = 1) and we have a teacher_id
-    if (roleId === 1 && teacherId) {
-      try {
-        // Fetch teacher details from API using axios
-        const teacherResponse = await api.get(`/api/v1/teachers/${teacherId}`);
-        
-        // Fetch teacher schedules separately
-        const schedulesResponse = await api.get(`/api/v1/teachers/${teacherId}/teacher_schedules`);
-        
-        if (teacherResponse.data.status === 'success' && teacherResponse.data.data) {
-          const teacherData = teacherResponse.data.data;
+  const handlePostLoginRedirection = async () => {
+    try {
+      setIsLoading(true);
+      // Get the user's role and ID from localStorage
+      const userDetails = JSON.parse(localStorage.getItem('personaldetails') || '{}');
+      const roleId = parseInt(localStorage.getItem('role_id'));
+      const teacherId = parseInt(localStorage.getItem('teacher_id'));
+      
+      // If user is a teacher (role_id = 1) and we have a teacher_id
+      if (roleId === 1 && teacherId) {
+        try {
+          // Fetch teacher details from API using axios
+          const teacherResponse = await api.get(`/api/v1/teachers/${teacherId}`);
           
-          // Save teacher data to localStorage for future use
-          localStorage.setItem('teacherData', JSON.stringify(teacherData));
+          // Fetch teacher schedules separately
+          const schedulesResponse = await api.get(`/api/v1/teachers/${teacherId}/teacher_schedules`);
           
-          // Determine redirect path based on completion status
-          if (teacherData.teacher_educational_qualification === null) {
-            navigate('/details2');
-          } else if (teacherData.teacher_preference === null) {
-            navigate('/teacherSubject');
-          } else if (schedulesResponse.data.status === 'success' && 
-                    (schedulesResponse.data.data === null || 
-                     schedulesResponse.data.data.length === 0)) {
-            // If schedules API returns empty array, redirect to slots page
-            navigate('/slots');
+          if (teacherResponse.data.status === 'success' && teacherResponse.data.data) {
+            const teacherData = teacherResponse.data.data;
+            
+            // Save teacher data to localStorage for future use
+            localStorage.setItem('teacherData', JSON.stringify(teacherData));
+            
+            // Determine redirect path based on completion status
+            if (teacherData.teacher_educational_qualification === null) {
+              navigate('/details2');
+            } else if (teacherData.teacher_preference === null) {
+              navigate('/teacherSubject');
+            } else if (schedulesResponse.data.status === 'success' && 
+                      (schedulesResponse.data.data === null || 
+                       schedulesResponse.data.data.length === 0)) {
+              // If schedules API returns empty array, redirect to slots page
+              navigate('/slots');
+            } else {
+              navigate('/dashboard');
+            }
           } else {
-            navigate('/dashboard');
+            // If API returns success but no data, redirect to /details as fallback
+            navigate('/details');
           }
-        } else {
-          // If API returns success but no data, redirect to /details as fallback
+        } catch (error) {
+          console.error('Error fetching teacher details:', error);
+          // If API call fails, redirect to /details as fallback
           navigate('/details');
         }
-      } catch (error) {
-        console.error('Error fetching teacher details:', error);
-        // If API call fails, redirect to /details as fallback
-        navigate('/details');
+      } else {
+        // For non-teachers or if teacher_id is missing, use the existing redirect logic
+        await authService.handleRoleBasedRedirection(navigate, setIsLoading, setErrors);
       }
-    } else {
-      // For non-teachers or if teacher_id is missing, use the existing redirect logic
-      await authService.handleRoleBasedRedirection(navigate, setIsLoading, setErrors);
+    } catch (error) {
+      console.error('Error during redirection:', error);
+      setServerError('Login successful but failed to get user information. Please try again.');
+      setIsLoading(false);
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error) {
-    console.error('Error during redirection:', error);
-    setServerError('Login successful but failed to get user information. Please try again.');
-    setIsLoading(false);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const validateLogin = () => {
     const newErrors = {};
@@ -108,13 +105,11 @@ const handlePostLoginRedirection = async () => {
   const validateSignup = () => {
     const newErrors = {};
     
-    // Email/Phone validation
+    // Email validation only
     if (!formData.emailOrPhone) {
       newErrors.emailOrPhone = 'Email is required';
-    } else if (formData.emailOrPhone.includes('@') && !/\S+@\S+\.\S+/.test(formData.emailOrPhone)) {
+    } else if (!/\S+@\S+\.\S+/.test(formData.emailOrPhone)) {
       newErrors.emailOrPhone = 'Please enter a valid email address';
-    } else if (!formData.emailOrPhone.includes('@') && !/^\d{10}$/.test(formData.emailOrPhone)) {
-      newErrors.emailOrPhone = 'Please enter a valid 10-digit phone number';
     }
     
     // Password validation
@@ -191,7 +186,7 @@ const handlePostLoginRedirection = async () => {
           if (error.response.data && error.response.data.message) {
             setServerError(error.response.data.message);
           } else if (error.response.status === 401) {
-            setServerError('Invalid email/phone or password. Please try again.');
+            setServerError('Invalid email or password. Please try again.');
           } else {
             setServerError(`Authentication failed (${error.response.status}). Please try again.`);
           }
@@ -213,20 +208,11 @@ const handlePostLoginRedirection = async () => {
         setIsLoading(true);
         setServerError(''); // Clear any previous errors
         
-        // Determine if email or phone was provided
-        const isEmail = formData.emailOrPhone.includes('@');
-        
         const userData = {
+          email: formData.emailOrPhone, // Only treating as email now
           password: formData.password,
           user_role_id: parseInt(formData.user_role_id, 10)
         };
-        
-        // Add either email or phone based on input
-        if (isEmail) {
-          userData.email = formData.emailOrPhone;
-        } else {
-          userData.phone = formData.emailOrPhone;
-        }
         
         console.log('Sending registration data:', userData);
         
@@ -237,7 +223,7 @@ const handlePostLoginRedirection = async () => {
         // After successful signup, switch to login mode
         setAuthMode('login');
         
-        // Clear form but keep the email/phone for convenience
+        // Clear form but keep the email for convenience
         const emailOrPhone = formData.emailOrPhone;
         setFormData({
           emailOrPhone: emailOrPhone,
@@ -284,7 +270,7 @@ const handlePostLoginRedirection = async () => {
                   
                   // Map API field names to form field names
                   let formField = key;
-                  if (key === 'email' || key === 'phone') {
+                  if (key === 'email') {
                     formField = 'emailOrPhone';
                   }
                   
@@ -381,7 +367,7 @@ const handlePostLoginRedirection = async () => {
               )}
               
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Email/Phone Input */}
+                {/* Email Input */}
                 <div className="space-y-1">
                   <div className="relative">
                     <input

@@ -7,6 +7,83 @@ export const teacherService = {
   // Get a specific teacher by ID
   getTeacherById: (id) => api.get(`/api/v1/teachers/${id}`),
   
+  // Save teacher (handles both create and update)
+  saveTeacher: (teacherData) => {
+    // Format date of birth to match expected format "DD/MM/YYYY"
+    let formattedDOB = teacherData.dateOfBirth;
+    if (formattedDOB && formattedDOB.includes('-')) {
+      // Convert from YYYY-MM-DD to DD/MM/YYYY
+      const [year, month, day] = formattedDOB.split('-');
+      formattedDOB = `${day}/${month}/${year}`;
+    }
+    
+    // Prepare the basic teacher data object
+    const teacherPayload = {
+      "name": teacherData.name,
+      "address": teacherData.address,
+      "mobile_number": teacherData.mobileNumber,
+      "email": teacherData.email || `${teacherData.name.toLowerCase().replace(/\s+/g, '')}@example.com`,
+      "gender": teacherData.gender,
+      "date_of_birth": formattedDOB,
+      "is_active": true,
+      // Add other fields based on whether we're creating or updating
+      "latitude": teacherData.latitude || null,
+      "longitude": teacherData.longitude || null
+    };
+    
+    // If updating, include other specific update fields
+    if (teacherData.id) {
+      teacherPayload.alt_mobile = teacherData.alternateNumber || "";
+      
+      console.log('Updating existing teacher:', teacherData.id);
+      return api.post(`/api/v1/teachers/${teacherData.id}`, {
+        teacher: teacherPayload
+      });
+    } 
+    // If creating, include creation-specific fields
+    else {
+      // Get the user_id with robust fallback
+      let userId = null;
+      
+      // Try multiple storage locations
+      const storedUserId = localStorage.getItem('user_id');
+      const userData = localStorage.getItem('user_data');
+      
+      if (storedUserId) {
+        userId = parseInt(storedUserId);
+        console.log('Using user_id from localStorage:', userId);
+      } else if (userData) {
+        try {
+          const parsedUserData = JSON.parse(userData);
+          if (parsedUserData && parsedUserData.id) {
+            userId = parseInt(parsedUserData.id);
+            console.log('Using user_id from user_data:', userId);
+            // Save for future use
+            localStorage.setItem('user_id', userId);
+          }
+        } catch (e) {
+          console.error('Error parsing user_data:', e);
+        }
+      }
+      
+      if (!userId) {
+        console.error('No user ID found in any storage location');
+        throw new Error('User ID is required but not found');
+      }
+      
+      // Add creation-specific fields
+      teacherPayload.user_id = userId;
+      teacherPayload.whatsapp_number = teacherData.whatsappNumber;
+      teacherPayload.profile_photo = teacherData.profilePhoto;
+      teacherPayload.aadhar_photo = teacherData.aadharPhoto;
+      
+      console.log('Creating new teacher');
+      return api.postForm('/api/v1/teachers', {
+        teacher: teacherPayload
+      });
+    }
+  },
+  
   // Create a new teacher - fixed to match exact API format
   createTeacher: (teacherData) => {
     // Format date of birth to match expected format "DD/MM/YYYY"
@@ -58,8 +135,8 @@ export const teacherService = {
         "gender": teacherData.gender,
         "date_of_birth": formattedDOB,
         // Add latitude and longitude if provided
-        "latitude": teacherData.latitude || null,
-        "longitude": teacherData.longitude || null,
+        "latitude": teacherData.latitude,
+        "longitude": teacherData.longitude,
         "profile_photo": teacherData.profilePhoto,
         "aadhar_photo": teacherData.aadharPhoto,
         "is_active": true,
@@ -71,34 +148,35 @@ export const teacherService = {
     
     return api.postForm('/api/v1/teachers', apiFormattedData);
   },
-  
-  // Update an existing teacher
-  updateTeacher: (id, teacherData) => {
-    // Format date of birth
-    let formattedDOB = teacherData.dateOfBirth;
-    if (formattedDOB && formattedDOB.includes('-')) {
-      // Convert from YYYY-MM-DD to DD/MM/YYYY
-      const [year, month, day] = formattedDOB.split('-');
-      formattedDOB = `${day}/${month}/${year}`;
-    }
-    
+  // Patch specific fields of a teacher
+  patchTeacher: (id, fieldsToUpdate) => {
     const apiFormattedData = {
-      "teacher": {
-        "name": teacherData.name,
-        "address": teacherData.address,
-        "mobile_number": teacherData.mobileNumber,
-        "email": teacherData.email || `${teacherData.name.toLowerCase().replace(/\s+/g, '')}@example.com`,
-        "alt_mobile": teacherData.alternateNumber || "",
-        "gender": teacherData.gender,
-        "date_of_birth": formattedDOB,
-        "is_active": true,
-        // Add latitude and longitude if provided
-        "latitude": teacherData.latitude || null,
-        "longitude": teacherData.longitude || null
-      }
+      "teacher": {}
     };
     
-    return api.post(`/api/v1/teachers/${id}`, apiFormattedData);
+    // Process each field that needs to be updated
+    Object.keys(fieldsToUpdate).forEach(key => {
+      let value = fieldsToUpdate[key];
+      
+      // Special handling for date of birth
+      if (key === 'dateOfBirth' || key === 'date_of_birth') {
+        if (value && value.includes('-')) {
+          // Convert from YYYY-MM-DD to DD/MM/YYYY
+          const [year, month, day] = value.split('-');
+          value = `${day}/${month}/${year}`;
+        }
+        apiFormattedData.teacher["date_of_birth"] = value;
+      } else {
+        // Map frontend camelCase to backend snake_case if needed
+        const apiKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
+        apiFormattedData.teacher[apiKey] = value;
+      }
+    });
+    
+    // Log the request for debugging
+    console.log('Sending PATCH request:', apiFormattedData);
+    
+    return api.patch(`/api/v1/teachers/${id}`, apiFormattedData);
   },
   
   // Delete a teacher

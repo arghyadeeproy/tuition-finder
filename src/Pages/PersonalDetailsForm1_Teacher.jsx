@@ -125,6 +125,9 @@ const PersonalDetailsForm = () => {
   };
 
   useEffect(() => {
+    // Immediately fetch location when component mounts
+    fetchCurrentLocation();
+    
     const userId = ensureUserIdPersistence();
     if (userId) {
       console.log('User ID confirmed in localStorage:', userId);
@@ -134,7 +137,16 @@ const PersonalDetailsForm = () => {
 
     const savedData = localStorage.getItem('personaldetails');
     if (savedData) {
-      setFormData(JSON.parse(savedData));
+      try {
+        const parsedData = JSON.parse(savedData);
+        // Don't include file objects from localStorage as they can't be properly serialized
+        const cleanedData = { ...parsedData };
+        delete cleanedData.aadharPhoto;
+        delete cleanedData.profilePhoto;
+        setFormData(cleanedData);
+      } catch (e) {
+        console.error('Error parsing saved personal details:', e);
+      }
     }
 
     const checkUserAuth = () => {
@@ -152,7 +164,6 @@ const PersonalDetailsForm = () => {
     };
 
     checkUserAuth();
-    fetchCurrentLocation();
   }, [navigate]);
 
   const handleSameMobileCheckbox = (e) => {
@@ -163,6 +174,10 @@ const PersonalDetailsForm = () => {
         ...prev,
         whatsappNumber: prev.mobileNumber
       }));
+      // Clear WhatsApp validation error if using same as mobile
+      if (errors.whatsappNumber) {
+        setErrors(prev => ({ ...prev, whatsappNumber: '' }));
+      }
     } else {
       setFormData(prev => ({
         ...prev,
@@ -171,59 +186,86 @@ const PersonalDetailsForm = () => {
     }
   };
 
+  // Enhanced validation function with detailed checks
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.aadharPhoto) {
-      newErrors.aadharPhoto = 'Aadhar card is required';
-    }
-    if (!formData.profilePhoto) {
-      newErrors.profilePhoto = 'Profile photo is required';
-    }
-    if (!formData.name) {
+    
+    // Name validation
+    if (!formData.name || formData.name.trim() === '') {
       newErrors.name = 'Name is required';
+    } else if (formData.name.length < 3) {
+      newErrors.name = 'Name must be at least 3 characters long';
     }
 
-    if (!formData.email) {
+    // Email validation with more comprehensive regex
+    if (!formData.email || formData.email.trim() === '') {
       newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Invalid email address';
+    } else if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
     }
 
+    // Mobile number validation - must be exactly 10 digits
     if (!formData.mobileNumber) {
       newErrors.mobileNumber = 'Mobile number is required';
     } else if (!/^\d{10}$/.test(formData.mobileNumber)) {
-      newErrors.mobileNumber = 'Invalid mobile number (10 digits required)';
+      newErrors.mobileNumber = 'Mobile number must be exactly 10 digits';
     }
 
-    if (formData.whatsappNumber && !/^\d{10}$/.test(formData.whatsappNumber)) {
-      newErrors.whatsappNumber = 'Invalid whatsapp number (10 digits required)';
+    // WhatsApp number validation - must be exactly 10 digits if provided
+    if (!useSameMobile && !formData.whatsappNumber) {
+      newErrors.whatsappNumber = 'WhatsApp number is required';
+    } else if (!useSameMobile && !/^\d{10}$/.test(formData.whatsappNumber)) {
+      newErrors.whatsappNumber = 'WhatsApp number must be exactly 10 digits';
     }
 
+    // Gender validation
     if (!formData.gender) {
       newErrors.gender = 'Please select a gender';
     }
 
+    // Date of birth validation
     if (!formData.dateOfBirth) {
       newErrors.dateOfBirth = 'Date of birth is required';
     } else {
-      const today = new Date().toISOString().split('T')[0];
-      if (formData.dateOfBirth > today) {
-        newErrors.dateOfBirth = 'Date of birth cannot be a future date';
+      const today = new Date();
+      const birthDate = new Date(formData.dateOfBirth);
+      const age = today.getFullYear() - birthDate.getFullYear();
+      
+      // Check age (must be at least 18)
+      if (age < 10) {
+        newErrors.dateOfBirth = 'You must be at least 10 years old';
+      } else if (formData.dateOfBirth > today.toISOString().split('T')[0]) {
+        newErrors.dateOfBirth = 'Date of birth cannot be in the future';
       }
     }
 
-    if (!formData.address) {
+    // Address validation
+    if (!formData.address || formData.address.trim() === '') {
       newErrors.address = 'Address is required';
+    } else if (formData.address.length < 10) {
+      newErrors.address = 'Please provide a complete address (minimum 10 characters)';
     }
 
-    if (formData.latitude && !/^-?([0-8]?[0-9]|90)(\.[0-9]{1,8})?$/.test(formData.latitude)) {
+    // Latitude validation - between -90 and 90 with up to 8 decimal places
+    if (formData.latitude && !isLatitudeValid(formData.latitude)) {
       newErrors.latitude = 'Invalid latitude format (must be between -90 and 90)';
     }
     
-    if (formData.longitude && !/^-?((1?[0-7]?|[0-9]?)[0-9]|180)(\.[0-9]{1,8})?$/.test(formData.longitude)) {
+    // Longitude validation - between -180 and 180 with up to 8 decimal places
+    if (formData.longitude && !isLongitudeValid(formData.longitude)) {
       newErrors.longitude = 'Invalid longitude format (must be between -180 and 180)';
     }
 
+    // File validation
+    if (!formData.aadharPhoto) {
+      newErrors.aadharPhoto = 'Aadhar card photo is required';
+    }
+    
+    if (!formData.profilePhoto) {
+      newErrors.profilePhoto = 'Profile photo is required';
+    }
+
+    // Include file size errors if they exist
     if (fileSizeError.aadharPhoto) {
       newErrors.aadharPhoto = fileSizeError.aadharPhoto;
     }
@@ -236,12 +278,42 @@ const PersonalDetailsForm = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Helper functions for latitude/longitude validation
+  const isLatitudeValid = (lat) => {
+    // Check if latitude is a valid number between -90 and 90 with up to 8 decimal places
+    const latRegex = /^-?([0-8]?[0-9](\.\d{1,8})?|90(\.0{1,8})?)$/;
+    return latRegex.test(lat);
+  };
+
+  const isLongitudeValid = (lng) => {
+    // Check if longitude is a valid number between -180 and 180 with up to 8 decimal places
+    const lngRegex = /^-?((1[0-7][0-9]|[0-9]{1,2})(\.\d{1,8})?|180(\.0{1,8})?)$/;
+    return lngRegex.test(lng);
+  };
+
+  const validateFileType = (file) => {
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    return validTypes.includes(file.type);
+  };
+
   const handleInputChange = (e) => {
     const { name, value, type, files } = e.target;
     
     if (type === 'file') {
-      if (files[0]) {
-        if (files[0].size > 512000) {
+      if (files && files.length > 0) {
+        const file = files[0];
+        
+        // Validate file type
+        if (!validateFileType(file)) {
+          setFileSizeError(prev => ({
+            ...prev,
+            [name]: 'Only JPG, JPEG, or PNG files are allowed'
+          }));
+          return;
+        }
+        
+        // Validate file size (500KB max)
+        if (file.size > 512000) { // 500 KB = 512000 bytes
           setFileSizeError(prev => ({
             ...prev,
             [name]: 'File size must be less than 500KB'
@@ -254,7 +326,8 @@ const PersonalDetailsForm = () => {
           }));
         }
         
-        const previewUrl = URL.createObjectURL(files[0]);
+        // Create and set preview URL
+        const previewUrl = URL.createObjectURL(file);
         
         if (name === 'aadharPhoto') {
           setAadharPreview(previewUrl);
@@ -264,7 +337,97 @@ const PersonalDetailsForm = () => {
         
         setFormData(prev => ({
           ...prev,
-          [name]: files[0]
+          [name]: file
+        }));
+
+        // Clear any existing error for this field
+        if (errors[name]) {
+          setErrors(prev => ({
+            ...prev,
+            [name]: ''
+          }));
+        }
+      }
+    } else if (name === 'latitude') {
+      // Validate latitude as user types
+      const isValid = isLatitudeValid(value) || value === '';
+      if (!isValid && value !== '') {
+        setErrors(prev => ({
+          ...prev,
+          latitude: 'Invalid latitude format (must be between -90 and 90)'
+        }));
+      } else {
+        setErrors(prev => ({
+          ...prev,
+          latitude: ''
+        }));
+      }
+      setFormData(prev => ({
+        ...prev,
+        latitude: value
+      }));
+    } else if (name === 'longitude') {
+      // Validate longitude as user types
+      const isValid = isLongitudeValid(value) || value === '';
+      if (!isValid && value !== '') {
+        setErrors(prev => ({
+          ...prev,
+          longitude: 'Invalid longitude format (must be between -180 and 180)'
+        }));
+      } else {
+        setErrors(prev => ({
+          ...prev,
+          longitude: ''
+        }));
+      }
+      setFormData(prev => ({
+        ...prev,
+        longitude: value
+      }));
+    } else if (name === 'mobileNumber') {
+      // Allow only digits in mobile number field
+      const onlyDigits = value.replace(/[^\d]/g, '');
+      
+      // Limit to 10 digits
+      const limitedDigits = onlyDigits.slice(0, 10);
+      
+      setFormData(prev => ({
+        ...prev,
+        [name]: limitedDigits
+      }));
+      
+      // Update WhatsApp number if "same as mobile" is checked
+      if (useSameMobile) {
+        setFormData(prev => ({
+          ...prev,
+          whatsappNumber: limitedDigits
+        }));
+      }
+      
+      // Clear any existing error for this field
+      if (errors[name]) {
+        setErrors(prev => ({
+          ...prev,
+          [name]: ''
+        }));
+      }
+    } else if (name === 'whatsappNumber') {
+      // Allow only digits in WhatsApp number field
+      const onlyDigits = value.replace(/[^\d]/g, '');
+      
+      // Limit to 10 digits
+      const limitedDigits = onlyDigits.slice(0, 10);
+      
+      setFormData(prev => ({
+        ...prev,
+        [name]: limitedDigits
+      }));
+      
+      // Clear any existing error for this field
+      if (errors[name]) {
+        setErrors(prev => ({
+          ...prev,
+          [name]: ''
         }));
       }
     } else {
@@ -273,19 +436,13 @@ const PersonalDetailsForm = () => {
         [name]: value
       }));
       
-      if (name === 'mobileNumber' && useSameMobile) {
-        setFormData(prev => ({
+      // Clear any existing error for this field
+      if (errors[name]) {
+        setErrors(prev => ({
           ...prev,
-          whatsappNumber: value
+          [name]: ''
         }));
       }
-    }
-    
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
     }
   };
 
@@ -300,24 +457,43 @@ const PersonalDetailsForm = () => {
         return;
       }
       
-      localStorage.setItem('personaldetails', JSON.stringify(formData));
+      // Store form data without file objects
+      const formDataToStore = { ...formData };
+      delete formDataToStore.aadharPhoto;
+      delete formDataToStore.profilePhoto;
+      localStorage.setItem('personaldetails', JSON.stringify(formDataToStore));
       
       try {
         setIsSubmitting(true);
         setApiError(null);
         setApiErrorDetails(null);
         
-        console.log('Submitting form with user_id:', userId);
+        // Check if we already have a teacher_id in localStorage
+        const existingTeacherId = localStorage.getItem('teacher_id');
+        let response;
         
-        const response = await teacherService.createTeacher(formData);
+        if (existingTeacherId) {
+          // Update existing teacher
+          console.log('Updating existing teacher with ID:', existingTeacherId);
+          response = await teacherService.patchTeacher(existingTeacherId, formData);
+        } else {
+          // Create new teacher
+          console.log('Creating new teacher with user_id:', userId);
+          response = await teacherService.createTeacher(formData);
+        }
+        
         console.log('API response:', response);
         
+        // Handle the response and save teacher_id consistently
         if (response.data && response.data.data && response.data.data.id) {
           localStorage.setItem('teacher_id', response.data.data.id);
           console.log('Saved teacher_id to localStorage:', response.data.data.id);
         } else if (response.data && response.data.id) {
           localStorage.setItem('teacher_id', response.data.id);
           console.log('Saved teacher_id to localStorage:', response.data.id);
+        } else if (existingTeacherId) {
+          // If we're updating and don't get a clear ID back, keep using the existing one
+          console.log('Keeping existing teacher_id:', existingTeacherId);
         }
         
         navigate('/details2');
@@ -353,6 +529,15 @@ const PersonalDetailsForm = () => {
       } finally {
         setIsSubmitting(false);
       }
+    } else {
+      // Scroll to the first error
+      const firstErrorField = Object.keys(errors)[0];
+      if (firstErrorField) {
+        const errorElement = document.querySelector(`[name="${firstErrorField}"]`);
+        if (errorElement) {
+          errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
     }
   };
 
@@ -361,12 +546,25 @@ const PersonalDetailsForm = () => {
   };
 
   const handleDelete = (type) => {
-    setFormData(prev => ({ ...prev, [type]: null }));
+    // Reset the file input value
     if (type === 'aadharPhoto') {
+      // Reset file input by setting it to null
+      setFormData(prev => ({ ...prev, aadharPhoto: null }));
       setAadharPreview(null);
+      // Reset any file input element
+      const fileInput = document.getElementById('aadhar-input');
+      if (fileInput) fileInput.value = '';
     } else if (type === 'profilePhoto') {
+      setFormData(prev => ({ ...prev, profilePhoto: null }));
       setProfilePreview(null);
+      // Reset any file input element
+      const fileInput = document.getElementById('profile-input');
+      if (fileInput) fileInput.value = '';
     }
+  };
+
+  const handleRefreshLocation = () => {
+    fetchCurrentLocation();
   };
 
   return (
@@ -386,7 +584,7 @@ const PersonalDetailsForm = () => {
         />
       </header>
       
-      <div className="flex-grow flex justify-center" style={{ marginTop: '450px', paddingBottom: '10px', overflow: 'auto' }}>
+      <div className="flex-grow flex justify-center" style={{ marginTop: '550px', paddingBottom: '10px', overflow: 'auto' }}>
         <div className="w-full max-w-4xl bg-white p-8 rounded-lg shadow-md my-8">
           <h1 className="text-3xl font-bold text-center mb-8 text-black">Personal Details</h1>
           
@@ -416,7 +614,7 @@ const PersonalDetailsForm = () => {
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
-                  placeholder="Enter your name"
+                  placeholder="Enter your full name"
                   className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
                     ${errors.name ? 'border-red-500' : 'border-gray-300'}`}
                 />
@@ -429,7 +627,7 @@ const PersonalDetailsForm = () => {
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  placeholder="Enter your email"
+                  placeholder="Enter your email address"
                   className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
                     ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
                 />
@@ -442,14 +640,16 @@ const PersonalDetailsForm = () => {
                   name="mobileNumber"
                   value={formData.mobileNumber}
                   onChange={handleInputChange}
-                  placeholder="Enter mobile number"
+                  placeholder="Enter 10-digit mobile number"
+                  maxLength={10}
                   className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
                     ${errors.mobileNumber ? 'border-red-500' : 'border-gray-300'}`}
                 />
                 {errors.mobileNumber && <p className="mt-1 text-sm text-red-500">{errors.mobileNumber}</p>}
+                <p className="mt-1 text-xs text-gray-500">Enter 10-digit number without country code</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-black">Whatsapp Number </label>
+                <label className="block text-sm font-medium text-black">WhatsApp Number <span className="text-red-500">*</span></label>
                 <div className="flex items-center mb-2">
                   <input
                     type="checkbox"
@@ -467,12 +667,14 @@ const PersonalDetailsForm = () => {
                   name="whatsappNumber"
                   value={formData.whatsappNumber}
                   onChange={handleInputChange}
-                  placeholder="Enter whatsapp number"
+                  placeholder="Enter 10-digit WhatsApp number"
+                  maxLength={10}
                   className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
                     ${errors.whatsappNumber ? 'border-red-500' : 'border-gray-300'}`}
                   disabled={useSameMobile}
                 />
                 {errors.whatsappNumber && <p className="mt-1 text-sm text-red-500">{errors.whatsappNumber}</p>}
+                <p className="mt-1 text-xs text-gray-500">Enter 10-digit number without country code</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-black">Gender <span className="text-red-500">*</span></label>
@@ -483,24 +685,37 @@ const PersonalDetailsForm = () => {
                   className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
                     ${errors.gender ? 'border-red-500' : 'border-gray-300'}`}
                 >
-                  <option value="">Choose</option>
+                  <option value="">Select Gender</option>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
                 </select>
                 {errors.gender && <p className="mt-1 text-sm text-red-500">{errors.gender}</p>}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-black">Date of Birth <span className="text-red-500">*</span></label>
-                <input
-                  type="date"
-                  name="dateOfBirth"
-                  value={formData.dateOfBirth}
-                  onChange={handleInputChange}
-                  className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
-                    ${errors.dateOfBirth ? 'border-red-500' : 'border-gray-300'}`}
-                />
-                {errors.dateOfBirth && <p className="mt-1 text-sm text-red-500">{errors.dateOfBirth}</p>}
-              </div>
+              </div><div>
+  <label className="block text-sm font-medium text-black">Date of Birth <span className="text-red-500">*</span></label>
+  <div 
+    className="relative"
+    onClick={(e) => {
+      // Find the date input in this container and focus/click it
+      const dateInput = e.currentTarget.querySelector('input[type="date"]');
+      if (dateInput) {
+        dateInput.focus();
+        dateInput.showPicker && dateInput.showPicker(); // Modern browsers support showPicker()
+      }
+    }}
+  >
+    <input
+      type="date"
+      name="dateOfBirth"
+      value={formData.dateOfBirth}
+      onChange={handleInputChange}
+      className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
+        ${errors.dateOfBirth ? 'border-red-500' : 'border-gray-300'}`}
+      max={new Date().toISOString().split('T')[0]} // Prevent future dates
+    />
+  </div>
+  {errors.dateOfBirth && <p className="mt-1 text-sm text-red-500">{errors.dateOfBirth}</p>}
+  <p className="mt-1 text-xs text-gray-500">You must be at least 10 years old</p>
+</div>
             </div>
             <div>
               <label className="block text-sm font-medium text-black">Address <span className="text-red-500">*</span></label>
@@ -509,7 +724,7 @@ const PersonalDetailsForm = () => {
                 name="address"
                 value={formData.address}
                 onChange={handleInputChange}
-                placeholder="Enter your address"
+                placeholder="Enter your complete address"
                 className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
                   ${errors.address ? 'border-red-500' : 'border-gray-300'}`}
               />
@@ -540,21 +755,22 @@ const PersonalDetailsForm = () => {
                 </label>
               </div>
               {errors.aadharPhoto && <p className="mt-1 text-sm text-red-500">{errors.aadharPhoto}</p>}
-              {fileSizeError.aadharPhoto && <p className="mt-1 text-sm text-red-500">{fileSizeError.aadharPhoto}</p>}
-              <p className="mt-1 text-xs text-black">* Upload scanned copy of your Aadhar Card (max 500KB)</p>
+              <p className="mt-1 text-xs text-gray-500">Upload scanned copy of your Aadhar Card (JPG, JPEG, PNG only, max 500KB)</p>
               
               <div className="mt-2 flex space-x-2">
                 {aadharPreview && (
                   <>
                     <button
-                      className="px-4 py-2 bg-indigo-500 text-white rounded-md"
+                      className="px-4 py-2 bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
                       onClick={() => handlePreview('aadhar')}
+                      type="button"
                     >
                       Preview
                     </button>
                     <button
-                      className="px-4 py-2 bg-red-500 text-white rounded-md"
+                      className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
                       onClick={() => handleDelete('aadharPhoto')}
+                      type="button"
                     >
                       Delete
                     </button>
@@ -563,7 +779,7 @@ const PersonalDetailsForm = () => {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-black">Profile Photo <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-black">Profile Photo <span className="text-red-500">*</span></label>
               <div className="relative">
                 <input
                   type="file"
@@ -587,21 +803,22 @@ const PersonalDetailsForm = () => {
                 </label>
               </div>
               {errors.profilePhoto && <p className="mt-1 text-sm text-red-500">{errors.profilePhoto}</p>}
-              {fileSizeError.profilePhoto && <p className="mt-1 text-sm text-red-500">{fileSizeError.profilePhoto}</p>}
-              <p className="mt-1 text-xs text-black">* Upload your Profile Photo (max 500KB)</p>
+              <p className="mt-1 text-xs text-gray-500">Upload your Profile Photo (JPG, JPEG, PNG only, max 500KB)</p>
               
               <div className="mt-2 flex space-x-2">
                 {profilePreview && (
                   <>
                     <button
-                      className="px-4 py-2 bg-indigo-500 text-white rounded-md"
+                      className="px-4 py-2 bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
                       onClick={() => handlePreview('profile')}
+                      type="button"
                     >
                       Preview
                     </button>
                     <button
-                      className="px-4 py-2 bg-red-500 text-white rounded-md"
+                      className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
                       onClick={() => handleDelete('profilePhoto')}
+                      type="button"
                     >
                       Delete
                     </button>
@@ -624,6 +841,7 @@ const PersonalDetailsForm = () => {
                   />
                 </div>
                 {errors.latitude && <p className="mt-1 text-sm text-red-500">{errors.latitude}</p>}
+                <p className="mt-1 text-xs text-gray-500">Must be between -90 and 90 (e.g., 28.6139)</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-black">Longitude</label>
@@ -639,34 +857,36 @@ const PersonalDetailsForm = () => {
                   />
                 </div>
                 {errors.longitude && <p className="mt-1 text-sm text-red-500">{errors.longitude}</p>}
+                <p className="mt-1 text-xs text-gray-500">Must be between -180 and 180 (e.g., 77.2090)</p>
               </div>
             </div>
             
-            {isGettingLocation && (
-              <div className="text-sm text-black flex items-center">
-                <svg className="animate-spin mr-2 h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Getting your current location...
-              </div>
-            )}
-            {errors.location && <p className="mt-1 text-sm text-red-500">{errors.location}</p>}
+            {errors.location && <p className="mt-1 text-sm text-red-500 text-center">{errors.location}</p>}
             
             <div className="flex justify-between items-center mt-6">
               <button
+                type="button"
                 className="px-6 py-2 bg-gray-200 rounded-md hover:bg-gray-300 text-black"
-                onClick={() => navigate('/role')}
+                onClick={() => navigate('/')}
                 disabled={isSubmitting}
               >
                 Back
               </button>
               <button
+                type="button"
                 className={`px-6 py-2 ${isSubmitting ? 'bg-indigo-400' : 'bg-indigo-600'} text-white rounded-md hover:bg-indigo-700`}
                 onClick={handleNext}
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Submitting...' : 'Next'}
+                {isSubmitting ? (
+                  <div className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Submitting...
+                  </div>
+                ) : 'Next'}
               </button>
             </div>
           </div>
@@ -674,29 +894,35 @@ const PersonalDetailsForm = () => {
       </div>
 
       {showPreview.aadhar && aadharPreview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white p-4 rounded-md">
-            <img src={aadharPreview} alt="Aadhar Preview" className="max-h-80" />
-            <button
-              className="mt-4 px-4 py-2 bg-red-500 text-white rounded-md"
-              onClick={() => setShowPreview(prev => ({ ...prev, aadhar: false }))}
-            >
-              Close
-            </button>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white p-4 rounded-md max-w-lg">
+            <h3 className="text-lg font-medium mb-2 text-black">Aadhar Card Preview</h3>
+            <img src={aadharPreview} alt="Aadhar Preview" className="max-h-96 max-w-full" />
+            <div className="flex justify-end mt-4">
+              <button
+                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
+                onClick={() => setShowPreview(prev => ({ ...prev, aadhar: false }))}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {showPreview.profile && profilePreview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white p-4 rounded-md">
-            <img src={profilePreview} alt="Profile Preview" className="max-h-80" />
-            <button
-              className="mt-4 px-4 py-2 bg-red-500 text-white rounded-md"
-              onClick={() => setShowPreview(prev => ({ ...prev, profile: false }))}
-            >
-              Close
-            </button>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white p-4 rounded-md max-w-lg">
+            <h3 className="text-lg font-medium mb-2 text-black">Profile Photo Preview</h3>
+            <img src={profilePreview} alt="Profile Preview" className="max-h-96 max-w-full" />
+            <div className="flex justify-end mt-4">
+              <button
+                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
+                onClick={() => setShowPreview(prev => ({ ...prev, profile: false }))}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
