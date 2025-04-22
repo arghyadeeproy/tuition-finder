@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { teacherService } from '../services/teacherService';
+import api from '../services/api'; // Import your axios instance
 
 const TutorDashboard = () => {
   const navigate = useNavigate();
@@ -18,11 +19,6 @@ const TutorDashboard = () => {
   useEffect(() => {
     // Load profile data from localStorage
     try {
-      const authToken = localStorage.getItem('auth_token');
-      const roleId = localStorage.getItem('role_id');
-      const userId = localStorage.getItem('user_id');
-      
-      // Get profile data from auth_response in localStorage
       const authResponseString = localStorage.getItem('auth_response');
       
       if (authResponseString) {
@@ -38,9 +34,9 @@ const TutorDashboard = () => {
           const teacherId = authResponse.profile[0].id;
           
           // Fetch teacher preferences including subjects
-          if (authToken && teacherId) {
-            fetchTeacherPreferences(teacherId, authToken);
-            fetchTeacherDetails(teacherId, authToken);
+          if (teacherId) {
+            fetchTeacherPreferences(teacherId);
+            fetchTeacherDetails(teacherId);
           }
         }
       }
@@ -50,23 +46,15 @@ const TutorDashboard = () => {
     }
   }, []);
 
-  // Function to fetch teacher details
-  const fetchTeacherDetails = async (teacherId, authToken) => {
+  // Function to fetch teacher details - now using axios
+  const fetchTeacherDetails = async (teacherId) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/v1/teachers/${teacherId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await api.get(`/api/v1/teachers/${teacherId}`);
       
-      const data = await response.json();
-      
-      if (data.status === 'success' && data.data) {
-        setTeacherDetails(data.data);
+      if (response.data.status === 'success' && response.data.data) {
+        setTeacherDetails(response.data.data);
       } else {
-        console.error('Error fetching teacher details:', data);
+        console.error('Error fetching teacher details:', response.data);
       }
       setIsLoading(false);
     } catch (error) {
@@ -75,23 +63,15 @@ const TutorDashboard = () => {
     }
   };
 
-  // Function to fetch teacher preferences
-  const fetchTeacherPreferences = async (teacherId, authToken) => {
+  // Function to fetch teacher preferences - now using axios
+  const fetchTeacherPreferences = async (teacherId) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/v1/teachers/${teacherId}/teacher_preferences`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await api.get(`/api/v1/teachers/${teacherId}/teacher_preferences`);
       
-      const data = await response.json();
-      
-      if (data.status === 'success' && data.data && data.data.length > 0) {
-        setTeacherSubjects(data.data[0].subjects || []);
+      if (response.data.status === 'success' && response.data.data && response.data.data.length > 0) {
+        setTeacherSubjects(response.data.data[0].subjects || []);
       } else {
-        console.error('Error fetching teacher preferences:', data);
+        console.error('Error fetching teacher preferences:', response.data);
       }
     } catch (error) {
       console.error('Error fetching teacher preferences:', error);
@@ -101,8 +81,8 @@ const TutorDashboard = () => {
   // Get profile photo URL or use fallback
   const getProfilePhotoUrl = () => {
     if (teacherDetails && teacherDetails.profile_photo) {
-      // Create a full URL by prepending the base URL to the relative path
-      return `http://localhost:3001${teacherDetails.profile_photo}`;
+      const baseURL = import.meta.env.VITE_API_URL;
+      return `${baseURL}${teacherDetails.profile_photo}`;
     }
     return "/assets/DP/dp1.jpg"; // Fallback image
   };
@@ -239,130 +219,138 @@ const TutorDashboard = () => {
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 grid grid-cols-1 gap-4 p-4 overflow-y-auto">
-        {/* Account Details Section */}
-        <div className="bg-white rounded-lg shadow-md p-4 overflow-hidden">
-          <div className="flex justify-between mb-4">
-            <h2 className="text-xl font-semibold text-black">Account Details</h2>
-          </div>
+      {/* Main Content - Vertical on laptops (md), Horizontal on desktop (lg) */}
+      <div className="flex-1 p-4 overflow-y-auto">
+        {/* This div controls the layout direction */}
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Left column (Account Details) - Full width on laptops, 1/3 width on desktop */}
+          <div className="w-full lg:w-1/3">
+            <div className="bg-white rounded-lg shadow-md p-4 overflow-hidden h-full">
+              <div className="flex justify-between mb-4">
+                <h2 className="text-xl font-semibold text-black">Account Details</h2>
+              </div>
 
-          {isLoading ? (
-            <div className="flex justify-center items-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700"></div>
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-4 gap-3">
-                <div className="flex items-center space-x-4">
-                  <img 
-                    src={getProfilePhotoUrl()} 
-                    alt="Profile" 
-                    className="w-16 h-16 rounded-full object-cover"
-                    onError={(e) => {e.target.src = "/assets/DP/dp1.jpg"}}
-                  />
-                  <div>
-                    <div className="text-base sm:text-lg font-bold text-black break-words">
-                      {teacherDetails?.name || profileData?.name || 'Name not available'} 
-                    </div>
-                    <div className="text-sm text-black break-words">
-                      {teacherDetails?.email || profileData?.email || 'email@mail.com'}
-                    </div>
-                    {teacherDetails?.mobile_number && (
-                      <div className="text-sm text-black">
-                        {teacherDetails.mobile_number}
+              {isLoading ? (
+                <div className="flex justify-center items-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700"></div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-4 gap-3">
+                    <div className="flex items-center space-x-4">
+                      <img 
+                        src={getProfilePhotoUrl()} 
+                        alt="Profile" 
+                        className="w-16 h-16 rounded-full object-cover"
+                        onError={(e) => {e.target.src = "/assets/DP/dp1.jpg"}}
+                      />
+                      <div>
+                        <div className="text-base sm:text-lg font-bold text-black break-words">
+                          {teacherDetails?.name || profileData?.name || 'Name not available'} 
+                        </div>
+                        <div className="text-sm text-black break-words">
+                          {teacherDetails?.email || profileData?.email || 'email@mail.com'}
+                        </div>
+                        {teacherDetails?.mobile_number && (
+                          <div className="text-sm text-black">
+                            {teacherDetails.mobile_number}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex flex-row sm:flex-col gap-2 sm:space-y-2">
-                  <button 
-                    className="h-9 w-20 bg-white border border-[#79747E] text-[#79747E] rounded-full hover:bg-gray-50 hover:text-gray-900 flex items-center justify-center"
-                    onClick={() => handleButtonClick('Edit')}
-                  >
-                    Edit
-                  </button>
-                  <button 
-                    className="h-9 w-20 bg-white border border-[#79747E] text-[#79747E] rounded-full hover:bg-gray-50 hover:text-gray-900 flex items-center justify-center"
-                    onClick={() => handleButtonClick('Details')}
-                  >
-                    Details
-                  </button>
-                </div>
-              </div>
-
-              {/* Subjects Section */}
-              <div className="mb-4">
-                <h3 className="font-semibold mb-2 text-black">Subjects I Teach</h3>
-                <div className="flex flex-wrap gap-2">
-                  {teacherSubjects.length > 0 ? (
-                    teacherSubjects.map((subject) => (
-                      <span 
-                        key={subject.id} 
-                        className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+                    </div>
+                    <div className="flex flex-row sm:flex-col gap-2 sm:space-y-2">
+                      <button 
+                        className="h-9 w-20 bg-white border border-[#79747E] text-[#79747E] rounded-full hover:bg-gray-50 hover:text-gray-900 flex items-center justify-center"
+                        onClick={() => handleButtonClick('Edit')}
                       >
-                        {subject.name}
-                      </span>
-                    ))
-                  ) : (
-                    <p className="text-gray-500 text-sm text-black">No subjects added yet</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Address section */}
-              {teacherDetails?.address && (
-                <div className="mb-4">
-                  <h3 className="font-semibold mb-2 text-black">Address</h3>
-                  <p className="text-sm text-black break-words">{teacherDetails.address}</p>
-                </div>
-              )}
-
-              {/* Teacher preferences display */}
-              {teacherDetails?.teacher_preference && (
-                <div className="mb-4">
-                  <h3 className="font-semibold mb-2 text-black">Teaching Preferences</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium text-black">Mode:</span>
-                      <span className="capitalize text-black">{teacherDetails.teacher_preference.teaching_mode}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium text-black">Type:</span>
-                      <span className="capitalize text-black">{teacherDetails.teacher_preference.preferred_teaching_type}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium text-black">Experience:</span>
-                      <span className="text-black">{teacherDetails.teacher_preference.prior_experience} years</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium text-black">Radius:</span>
-                      <span className="text-black">{teacherDetails.teacher_preference.teaching_radius_km} km</span>
+                        Edit
+                      </button>
+                      <button 
+                        className="h-9 w-20 bg-white border border-[#79747E] text-[#79747E] rounded-full hover:bg-gray-50 hover:text-gray-900 flex items-center justify-center"
+                        onClick={() => handleButtonClick('Details')}
+                      >
+                        Details
+                      </button>
                     </div>
                   </div>
-                </div>
+
+                  {/* Subjects Section */}
+                  <div className="mb-4">
+                    <h3 className="font-semibold mb-2 text-black">Subjects I Teach</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {teacherSubjects.length > 0 ? (
+                        teacherSubjects.map((subject) => (
+                          <span 
+                            key={subject.id} 
+                            className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+                          >
+                            {subject.name}
+                          </span>
+                        ))
+                      ) : (
+                        <p className="text-gray-500 text-sm text-black">No subjects added yet</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Address section */}
+                  {teacherDetails?.address && (
+                    <div className="mb-4">
+                      <h3 className="font-semibold mb-2 text-black">Address</h3>
+                      <p className="text-sm text-black break-words">{teacherDetails.address}</p>
+                    </div>
+                  )}
+
+                  {/* Teacher preferences display */}
+                  {teacherDetails?.teacher_preference && (
+                    <div className="mb-4">
+                      <h3 className="font-semibold mb-2 text-black">Teaching Preferences</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium text-black">Mode:</span>
+                          <span className="capitalize text-black">{teacherDetails.teacher_preference.teaching_mode}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium text-black">Type:</span>
+                          <span className="capitalize text-black">{teacherDetails.teacher_preference.preferred_teaching_type}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium text-black">Experience:</span>
+                          <span className="text-black">{teacherDetails.teacher_preference.prior_experience} years</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium text-black">Radius:</span>
+                          <span className="text-black">{teacherDetails.teacher_preference.teaching_radius_km} km</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
-            </>
-          )}
-        </div>
-
-        {/* Active Section */}
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <h2 className="text-xl font-semibold sticky top-0 bg-white py-2 text-black">Active</h2>
-          <div className="flex flex-col items-center justify-center py-8 text-gray-500">
-            <div className="text-5xl mb-4">📚</div>
-            <p className="text-black text-center">No active tutoring sessions</p>
-            <p className="text-sm text-black text-center">When you approve requests, they will appear here</p>
+            </div>
           </div>
-        </div>
 
-        {/* New Requests Section */}
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <h2 className="text-xl font-semibold sticky top-0 bg-white py-2 text-black">New Requests</h2>
-          <div className="flex flex-col items-center justify-center py-8 text-gray-500">
-            <div className="text-5xl mb-4">🔍</div>
-            <p className="text-black text-center">No new tutoring requests</p>
-            <p className="text-sm text-black text-center">New student requests will appear here</p>
+          {/* Right column (Active + New Requests) - Full width on laptops, 2/3 width on desktop */}
+          <div className="w-full lg:w-2/3 flex flex-col gap-4">
+            {/* Active Section */}
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <h2 className="text-xl font-semibold sticky top-0 bg-white py-2 text-black">Active</h2>
+              <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+                <div className="text-5xl mb-4">📚</div>
+                <p className="text-black text-center">No active tutoring sessions</p>
+                <p className="text-sm text-black text-center">When you approve requests, they will appear here</p>
+              </div>
+            </div>
+
+            {/* New Requests Section */}
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <h2 className="text-xl font-semibold sticky top-0 bg-white py-2 text-black">New Requests</h2>
+              <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+                <div className="text-5xl mb-4">🔍</div>
+                <p className="text-black text-center">No new tutoring requests</p>
+                <p className="text-sm text-black text-center">New student requests will appear here</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
