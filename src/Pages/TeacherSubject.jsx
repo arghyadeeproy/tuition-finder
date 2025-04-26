@@ -503,7 +503,7 @@ export default function TuitionFinderForm() {
 
                 {/* Document Upload - Updated with file type restrictions */}
                 <div className="mt-6 flex items-center justify-between">
-                  <p className="text-sm text-black">Attach your CV <span className="text-red-500">*</span></p>
+                  <p className="text-sm text-black">Attach your Marksheet of 12  <span className="text-red-500">*</span></p>
                   <input 
                     type="file" 
                     ref={fileInputRef}
@@ -521,7 +521,7 @@ export default function TuitionFinderForm() {
                       <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm0-2a6 6 0 100-12 6 6 0 000 12z" clipRule="evenodd" />
                     </svg>
-                    Upload CV
+                    Upload Marksheet
                   </button>
                 </div>
                 {fileError && (

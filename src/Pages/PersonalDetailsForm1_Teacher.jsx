@@ -312,6 +312,11 @@ const PersonalDetailsForm = () => {
             ...prev,
             [name]: 'Only JPG, JPEG, or PNG files are allowed'
           }));
+          // Also set error in errors state for immediate feedback
+          setErrors(prev => ({
+            ...prev,
+            [name]: 'Only JPG, JPEG, or PNG files are allowed'
+          }));
           return;
         }
         
@@ -321,9 +326,19 @@ const PersonalDetailsForm = () => {
             ...prev,
             [name]: 'File size must be less than 500KB'
           }));
+          // Also set error in errors state for immediate feedback
+          setErrors(prev => ({
+            ...prev,
+            [name]: 'File size must be less than 500KB'
+          }));
           return;
         } else {
           setFileSizeError(prev => ({
+            ...prev,
+            [name]: ''
+          }));
+          // Clear error in errors state if previously set
+          setErrors(prev => ({
             ...prev,
             [name]: ''
           }));
@@ -777,6 +792,10 @@ const PersonalDetailsForm = () => {
                 </label>
               </div>
               {errors.profilePhoto && <p className="mt-1 text-sm text-red-500">{errors.profilePhoto}</p>}
+              {/* Show error message if profile photo is above 500KB */}
+              {fileSizeError.profilePhoto && (
+                <p className="mt-1 text-sm text-red-500">{fileSizeError.profilePhoto}</p>
+              )}
               <p className="mt-1 text-xs text-gray-500">Upload your Profile Photo (JPG, JPEG, PNG only, max 500KB)</p>
               
               <div className="mt-2 flex space-x-2">
