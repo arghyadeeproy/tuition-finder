@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api, { authService } from '../services/api';
+import termsAndConditionsData from '../constant/t&c'; 
 
 const CombinedAuthForm = () => {
   // Combined form data for both login and signup
@@ -20,6 +21,7 @@ const CombinedAuthForm = () => {
   const [authMode, setAuthMode] = useState('login'); // 'login' or 'signup'
   const [serverError, setServerError] = useState(''); // New state for server errors
   const [serverSuccess, setServerSuccess] = useState(''); // New state for server success messages
+  const [showTermsPopup, setShowTermsPopup] = useState(false); // State for terms popup
   
   const navigate = useNavigate();
 
@@ -54,7 +56,7 @@ const CombinedAuthForm = () => {
             
             // Determine redirect path based on completion status
             if (teacherData.teacher_educational_qualification === null) {
-              navigate('/details2');
+              navigate('/educational_details_teacher');
             } else if (teacherData.teacher_preference === null) {
               navigate('/teacherSubject');
             } else if (schedulesResponse.data.status === 'success' && 
@@ -66,13 +68,13 @@ const CombinedAuthForm = () => {
               navigate('/dashboard');
             }
           } else {
-            // If API returns success but no data, redirect to /details as fallback
-            navigate('/details');
+            // If API returns success but no data, redirect to /personal_details_teacher as fallback
+            navigate('/personal_details_teacher');
           }
         } catch (error) {
           console.error('Error fetching teacher details:', error);
-          // If API call fails, redirect to /details as fallback
-          navigate('/details');
+          // If API call fails, redirect to /personal_details_teacher as fallback
+          navigate('/personal_details_teacher');
         }
       } else {
         // For non-teachers or if teacher_id is missing, use the existing redirect logic
@@ -156,47 +158,50 @@ const CombinedAuthForm = () => {
     if (validateLogin()) {
       try {
         setIsLoading(true);
-        setServerError(''); // Clear any previous errors
-        
-        // Create credentials object based on input type
-        const credentials = { email: formData.emailOrPhone, password: formData.password }
-        
-        console.log('Sending login credentials:', credentials);
-        
-        // Use the authService to handle login
-        const response = await authService.signIn(credentials);
-        console.log('Login successful:', response);
+      setServerError(''); // Clear any previous errors
+      
+      // Create credentials object based on input type
+      const credentials = { email: formData.emailOrPhone, password: formData.password }
+      
+      console.log('Sending login credentials:', credentials);
+      
+      // Use the authService to handle login
+      const response = await authService.signIn(credentials);
+      console.log('Login successful:', response);
 
-        if(response.data.profile === null){
-          navigate('/details');
-        }
-        
-        // The authService has already stored auth data in localStorage
-        
-        // After successful login, let the post-login redirect function handle redirection
-        await handlePostLoginRedirection();
+      // Save email to localStorage for future use
+      localStorage.setItem('userEmail', formData.emailOrPhone);
+      
+      if(response.data.profile === null){
+        navigate('/personal_details_teacher');
+      }
+      
+      // After successful login, let the post-login redirect function handle redirection
+      await handlePostLoginRedirection();
         
       } catch (error) {
         console.error('Login error:', error);
-        
-        // Handle different types of errors
-        if (error.response) {
-          console.log('Error response data:', error.response.data);
-          
-          if (error.response.data && error.response.data.message) {
-            setServerError(error.response.data.message);
-          } else if (error.response.status === 401) {
-            setServerError('Invalid email or password. Please try again.');
-          } else {
-            setServerError(`Authentication failed (${error.response.status}). Please try again.`);
-          }
-        } else if (error.request) {
-          setServerError('No response from server. Please try again later.');
-        } else {
-          setServerError(error.message || 'Login failed. Please try again.');
-        }
-        
-        setIsLoading(false);
+  
+  // Enhanced error handling
+  if (error.response) {
+    console.log('Error response data:', error.response.data);
+    
+    if (error.response.data && error.response.data.error_description) {
+      setServerError(error.response.data.error_description);
+    } else if (error.response.data && error.response.data.message) {
+      setServerError(error.response.data.message);
+    } else if (error.response.status === 401) {
+      setServerError('Invalid email or password. Please try again.');
+    } else {
+      setServerError(`Authentication failed (${error.response.status}). Please try again.`);
+    }
+  } else if (error.request) {
+    setServerError('No response from server. Please try again later.');
+  } else {
+    setServerError(error.message || 'Login failed. Please try again.');
+  }
+  
+  setIsLoading(false);
       }
     }
   };
@@ -316,6 +321,22 @@ const CombinedAuthForm = () => {
     setErrors({});
     setServerError('');
     setServerSuccess('');
+  };
+
+  const openTermsPopup = () => {
+    setShowTermsPopup(true);
+  };
+
+  const closeTermsPopup = () => {
+    setShowTermsPopup(false);
+  };
+
+  const acceptTerms = () => {
+    setFormData(prev => ({
+      ...prev,
+      agreeToTerms: true
+    }));
+    setShowTermsPopup(false);
   };
 
   return (
@@ -499,7 +520,7 @@ const CombinedAuthForm = () => {
                       </div>
                     </div>
                     
-                    <div className="flex items-start mt-2">
+                    <div className="flex items-center mt-2">
                       <div className="flex items-center h-5">
                         <input
                           id="agreeToTerms"
@@ -510,15 +531,22 @@ const CombinedAuthForm = () => {
                           className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                         />
                       </div>
-                      <div className="ml-3 text-sm">
+                      <div className="ml-3 text-sm flex items-center">
                         <label htmlFor="agreeToTerms" className="text-gray-700">
-                          I agree to the <a href="/terms" className="text-indigo-600 hover:text-indigo-800">Terms and Conditions</a>
+                          I agree to the 
                         </label>
-                        {errors.agreeToTerms && (
-                          <p className="text-red-500 text-sm mt-1">{errors.agreeToTerms}</p>
-                        )}
+                        <button 
+                          type="button" 
+                          onClick={openTermsPopup} 
+                          className="ml-1 text-indigo-600 hover:text-indigo-800 bg-white px-2 py-1 rounded"
+                        >
+                          Terms and Conditions
+                        </button>
                       </div>
                     </div>
+                    {errors.agreeToTerms && (
+                      <p className="text-red-500 text-sm mt-1">{errors.agreeToTerms}</p>
+                    )}
                   </>
                 )}
 
@@ -547,8 +575,8 @@ const CombinedAuthForm = () => {
                 <div className="text-center mt-4">
                   <p className="text-gray-600">
                     {authMode === 'login' 
-                      ? <>Don't have an account? <button type="button" onClick={toggleAuthMode} className="text-indigo-600 hover:text-indigo-800">Sign up</button></>
-                      : <>Already have an account? <button type="button" onClick={toggleAuthMode} className="text-indigo-600 hover:text-indigo-800">Log in</button></>
+                      ? <>Don't have an account? <button type="button" onClick={toggleAuthMode} className="text-indigo-600 hover:text-indigo-800 focus:outline-none">Sign up</button></>
+                      : <>Already have an account? <button type="button" onClick={toggleAuthMode} className="text-indigo-600 hover:text-indigo-800 focus:outline-none">Log in</button></>
                     }
                   </p>
                 </div>
@@ -557,6 +585,80 @@ const CombinedAuthForm = () => {
           </div>
         </div>
       </div>
+
+      {/* Terms and Conditions Popup */}
+      {showTermsPopup && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+      <div className="p-6 border-b">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-bold text-gray-900">{termsAndConditionsData.title}</h2>
+          <button 
+            onClick={closeTermsPopup}
+            className="text-gray-400 hover:text-gray-500"
+          >
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <p className="text-sm text-gray-500 mt-1">Last updated: {termsAndConditionsData.lastUpdated}</p>
+      </div>
+      
+      <div className="p-6 overflow-y-auto flex-grow">
+        {termsAndConditionsData.sections.map((section, index) => (
+          <div key={index} className="mb-6">
+            <h3 className="font-semibold text-gray-900 mb-2">{section.heading}</h3>
+            
+            {section.content && (
+              <p className="text-gray-700">{section.content}</p>
+            )}
+            
+            {section.intro && (
+              <p className="text-gray-700 mb-2">{section.intro}</p>
+            )}
+            
+            {section.items && (
+              <ul className="list-disc pl-5 text-gray-700 space-y-1">
+                {section.items.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
+              </ul>
+            )}
+            
+            {section.additional && (
+              <p className="text-gray-700 mt-2">
+                {section.additional.includes("not") ? (
+                  <>
+                    We do <strong>not</strong> sell your personal information to third parties.
+                  </>
+                ) : (
+                  section.additional
+                )}
+              </p>
+            )}
+          </div>
+        ))}
+        <p className="text-gray-600 italic mt-4">{termsAndConditionsData.footer}</p>
+      </div>
+      
+      <div className="p-6 border-t flex justify-end space-x-3">
+        <button
+          onClick={closeTermsPopup}
+          className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={acceptTerms}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+        >
+          I Agree
+        </button>
+      </div>
+    </div>
+  </div>
+      )}
     </div>
   );
 };

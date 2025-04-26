@@ -62,7 +62,7 @@ const PersonalDetailsForm = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
-    email: '',
+    email: localStorage.getItem('userEmail') || '',
     mobileNumber: '',
     whatsappNumber: '',
     gender: '',
@@ -78,7 +78,7 @@ const PersonalDetailsForm = () => {
   const [apiError, setApiError] = useState(null);
   const [apiErrorDetails, setApiErrorDetails] = useState(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
-  const [useSameMobile, setUseSameMobile] = useState(false);
+  const [useSameMobile, setUseSameMobile] = useState(true);
   const [aadharPreview, setAadharPreview] = useState(null);
   const [profilePreview, setProfilePreview] = useState(null);
   const [fileSizeError, setFileSizeError] = useState({
@@ -143,7 +143,10 @@ const PersonalDetailsForm = () => {
         const cleanedData = { ...parsedData };
         delete cleanedData.aadharPhoto;
         delete cleanedData.profilePhoto;
-        setFormData(cleanedData);
+        setFormData(prev => ({
+          ...cleanedData,
+          email: localStorage.getItem('userEmail') || prev.email
+        }));
       } catch (e) {
         console.error('Error parsing saved personal details:', e);
       }
@@ -348,42 +351,6 @@ const PersonalDetailsForm = () => {
           }));
         }
       }
-    } else if (name === 'latitude') {
-      // Validate latitude as user types
-      const isValid = isLatitudeValid(value) || value === '';
-      if (!isValid && value !== '') {
-        setErrors(prev => ({
-          ...prev,
-          latitude: 'Invalid latitude format (must be between -90 and 90)'
-        }));
-      } else {
-        setErrors(prev => ({
-          ...prev,
-          latitude: ''
-        }));
-      }
-      setFormData(prev => ({
-        ...prev,
-        latitude: value
-      }));
-    } else if (name === 'longitude') {
-      // Validate longitude as user types
-      const isValid = isLongitudeValid(value) || value === '';
-      if (!isValid && value !== '') {
-        setErrors(prev => ({
-          ...prev,
-          longitude: 'Invalid longitude format (must be between -180 and 180)'
-        }));
-      } else {
-        setErrors(prev => ({
-          ...prev,
-          longitude: ''
-        }));
-      }
-      setFormData(prev => ({
-        ...prev,
-        longitude: value
-      }));
     } else if (name === 'mobileNumber') {
       // Allow only digits in mobile number field
       const onlyDigits = value.replace(/[^\d]/g, '');
@@ -430,7 +397,12 @@ const PersonalDetailsForm = () => {
           [name]: ''
         }));
       }
-    } else {
+    } else if (name === 'latitude' || name === 'longitude') {
+      // Don't allow changes to latitude or longitude
+      // These fields are read-only and should be set only by the location detection
+      return;
+    } else if (name !== 'email') {
+      // Don't allow changes to email
       setFormData(prev => ({
         ...prev,
         [name]: value
@@ -496,7 +468,7 @@ const PersonalDetailsForm = () => {
           console.log('Keeping existing teacher_id:', existingTeacherId);
         }
         
-        navigate('/details2');
+        navigate('/educational_details_teacher');
       } catch (error) {
         console.error('Error submitting form:', error);
         
@@ -571,11 +543,11 @@ const PersonalDetailsForm = () => {
     <div className="min-h-screen w-screen bg-indigo-100 flex flex-col">
       <header className="bg-[#4527a0] text-black p-4 flex items-center fixed top-0 left-0 right-0 z-10" style={{height: '100px' }}>
         <img 
-          src="/assets/LOGO (2).png" 
+          src="/assets/LOGO (1).png" 
           alt="Star Educators Logo"
           style={{
-            height: '78.24px',
-            width: '169.89px',
+            height: '50px',
+            width: '50px',
             position: 'relative',
             left: '69px',
             cursor: 'pointer'
@@ -626,9 +598,8 @@ const PersonalDetailsForm = () => {
                   type="email"
                   name="email"
                   value={formData.email}
-                  onChange={handleInputChange}
-                  placeholder="Enter your email address"
-                  className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
+                  readOnly
+                  className={`mt-1 block w-full px-3 py-2 border rounded-md bg-gray-100 text-black
                     ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
                 />
                 {errors.email && <p className="mt-1 text-sm text-red-500">{errors.email}</p>}
@@ -656,25 +627,28 @@ const PersonalDetailsForm = () => {
                     id="sameMobileCheckbox"
                     checked={useSameMobile}
                     onChange={handleSameMobileCheckbox}
-                    className="mr-2"
+                    className="mr-2 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                   />
-                  <label htmlFor="sameMobileCheckbox" className="text-sm text-black">
+                  <label htmlFor="sameMobileCheckbox" className="text-sm text-black font-medium">
                     Same as mobile number
                   </label>
                 </div>
-                <input
-                  type="tel"
-                  name="whatsappNumber"
-                  value={formData.whatsappNumber}
-                  onChange={handleInputChange}
-                  placeholder="Enter 10-digit WhatsApp number"
-                  maxLength={10}
-                  className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
-                    ${errors.whatsappNumber ? 'border-red-500' : 'border-gray-300'}`}
-                  disabled={useSameMobile}
-                />
-                {errors.whatsappNumber && <p className="mt-1 text-sm text-red-500">{errors.whatsappNumber}</p>}
-                <p className="mt-1 text-xs text-gray-500">Enter 10-digit number without country code</p>
+                {!useSameMobile && (
+                  <div className="transition-all duration-300 ease-in-out">
+                    <input
+                      type="tel"
+                      name="whatsappNumber"
+                      value={formData.whatsappNumber}
+                      onChange={handleInputChange}
+                      placeholder="Enter 10-digit WhatsApp number"
+                      maxLength={10}
+                      className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
+                        ${errors.whatsappNumber ? 'border-red-500' : 'border-gray-300'}`}
+                    />
+                    {errors.whatsappNumber && <p className="mt-1 text-sm text-red-500">{errors.whatsappNumber}</p>}
+                    <p className="mt-1 text-xs text-gray-500">Enter 10-digit number without country code</p>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-black">Gender <span className="text-red-500">*</span></label>
@@ -836,8 +810,9 @@ const PersonalDetailsForm = () => {
                     value={formData.latitude}
                     onChange={handleInputChange}
                     placeholder="Enter latitude"
-                    className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
+                    className={`mt-1 block w-full px-3 py-2 border rounded-md bg-gray-100 text-black
                       ${errors.latitude ? 'border-red-500' : 'border-gray-300'}`}
+                    readOnly
                   />
                 </div>
                 {errors.latitude && <p className="mt-1 text-sm text-red-500">{errors.latitude}</p>}
@@ -852,8 +827,9 @@ const PersonalDetailsForm = () => {
                     value={formData.longitude}
                     onChange={handleInputChange}
                     placeholder="Enter longitude"
-                    className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
+                    className={`mt-1 block w-full px-3 py-2 border rounded-md bg-gray-100 text-black
                       ${errors.longitude ? 'border-red-500' : 'border-gray-300'}`}
+                    readOnly
                   />
                 </div>
                 {errors.longitude && <p className="mt-1 text-sm text-red-500">{errors.longitude}</p>}
@@ -892,6 +868,10 @@ const PersonalDetailsForm = () => {
           </div>
         </div>
       </div>
+
+      <footer className="bg-[#4527a0] text-white py-4 text-center">
+        <p>For any technical issues, please contact: <a href="mailto:tech.star.educators@gmail.com" className="underline hover:text-indigo-200">tech.star.educators@gmail.com</a></p>
+      </footer>
 
       {showPreview.aadhar && aadharPreview && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">

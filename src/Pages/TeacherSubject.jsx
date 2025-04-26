@@ -25,6 +25,7 @@ export default function TuitionFinderForm() {
   const [error, setError] = useState(null);
   const [submitError, setSubmitError] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [fileError, setFileError] = useState(null);
 
   // Teaching medium options
   const teachingMediumOptions = [
@@ -92,10 +93,26 @@ export default function TuitionFinderForm() {
   };
 
   const handleFileChange = (e) => {
+    setFileError(null);
     if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      
+      // Check file type
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+      if (!validTypes.includes(file.type)) {
+        setFileError('Please upload only JPG, JPEG or PNG files');
+        return;
+      }
+      
+      // Check file size (500KB = 512000 bytes)
+      if (file.size > 512000) {
+        setFileError('File size must be less than 500KB');
+        return;
+      }
+      
       setFormData({
         ...formData,
-        resume: e.target.files[0]
+        resume: file
       });
     }
   };
@@ -211,8 +228,6 @@ export default function TuitionFinderForm() {
       const response = await teacherService.createTeacherPreferences(teacherId, teacherPreferenceRequest);
       console.log("Response from server:", response);
       
-      // Handle successful submission
-      alert('Your teacher preferences have been submitted successfully!');
       
       // Navigate to /slots after successful submission
       navigate('/slots');
@@ -224,7 +239,7 @@ export default function TuitionFinderForm() {
   };
 
   const handleBack = () => {
-    navigate('/details2');
+    navigate('/personal_details_teacher2');
   };
 
   return (
@@ -434,18 +449,27 @@ export default function TuitionFinderForm() {
                   </div>
                 </div>
 
-                {/* Teaching Radius */}
+                {/* Teaching Radius - Changed to slider */}
                 <div className="mt-6">
                   <label className="text-sm text-black block mb-2">I teach within radius (in KMs) <span className="text-red-500">*</span></label>
-                  <input
-                    type="number"
-                    name="radius"
-                    value={formData.radius}
-                    onChange={handleChange}
-                    min="1"
-                    required
-                    className="w-full border border-gray-300 rounded p-2 text-black"
-                  />
+                  <div className="flex flex-col space-y-2">
+                    <input
+                      type="range"
+                      name="radius"
+                      value={formData.radius}
+                      onChange={handleChange}
+                      min="0"
+                      max="50"
+                      step="1"
+                      required
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <div className="flex justify-between">
+                      <span className="text-xs text-gray-500">0 KM</span>
+                      <span className="text-sm font-medium text-indigo-800">{formData.radius} KM</span>
+                      <span className="text-xs text-gray-500">50 KM</span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* School Teaching */}
@@ -477,13 +501,14 @@ export default function TuitionFinderForm() {
                   </div>
                 </div>
 
-                {/* Document Upload */}
+                {/* Document Upload - Updated with file type restrictions */}
                 <div className="mt-6 flex items-center justify-between">
                   <p className="text-sm text-black">Attach your CV <span className="text-red-500">*</span></p>
                   <input 
                     type="file" 
                     ref={fileInputRef}
                     onChange={handleFileChange}
+                    accept=".jpg,.jpeg,.png"
                     className="hidden" 
                     required
                   />
@@ -499,11 +524,19 @@ export default function TuitionFinderForm() {
                     Upload CV
                   </button>
                 </div>
-                {formData.resume && (
+                {fileError && (
+                  <div className="text-sm text-red-600 mt-1">
+                    {fileError}
+                  </div>
+                )}
+                {formData.resume && !fileError && (
                   <div className="text-sm text-green-600 mt-1">
                     File selected: {formData.resume.name}
                   </div>
                 )}
+                <div className="text-xs text-gray-500 mt-1">
+                  Only JPG, JPEG or PNG files under 500KB are accepted
+                </div>
 
                 {/* Special Training */}
                 <div className="mt-6">
@@ -549,7 +582,7 @@ export default function TuitionFinderForm() {
                 Back
               </button>
               <button type="submit" className="bg-indigo-800 text-white px-8 py-2 rounded-full flex items-center">
-                Submit
+                Next
                 <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                 </svg>
@@ -558,6 +591,9 @@ export default function TuitionFinderForm() {
           </form>
         </div>
       </div>
+      <footer className="bg-[#4527a0] text-white py-4 text-center">
+        <p>For any technical issues, please contact: <a href="mailto:tech.star.educators@gmail.com" className="underline hover:text-indigo-200">tech.star.educators@gmail.com</a></p>
+      </footer>
     </div>
   );
 }

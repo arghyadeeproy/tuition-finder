@@ -385,12 +385,12 @@ export const authService = {
           navigate('/dashboard');
         } else {
           console.log('Redirecting to details');
-          navigate('/details');
+          navigate('/personal_details_teacher');
         }
       } catch (error) {
         console.error('Error fetching user data:', error);
         // Default to details if unable to determine profile status
-        navigate('/details');
+        navigate('/personal_details_teacher');
       }
       
       if (setIsLoading) {

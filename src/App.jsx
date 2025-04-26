@@ -24,10 +24,10 @@ const App = () => {
     <div>
       <Routes>
         <Route path='/' element={<TF />} />
-        <Route path='/details' element={<PDF_T />} />
+        <Route path='/personal_details_teacher' element={<PDF_T />} />
         <Route path='/studentdetails1' element={<PDF_S />} />
         <Route path='/studentdetails2' element={<EDF_S />} />
-        <Route path='/details2' element={<EDF_T />} />
+        <Route path='/educational_details_teacher' element={<EDF_T />} />
         <Route path='/jobdetails1' element={<PDF_J />} />
         <Route path='/jobdetails2' element={<EDF_J />} />
         <Route path='/slots' element={<Slots />} />

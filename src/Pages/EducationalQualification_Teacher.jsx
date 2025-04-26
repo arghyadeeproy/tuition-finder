@@ -21,6 +21,9 @@ const PersonalDetailsForm = () => {
   const [subjects, setSubjects] = useState([]);
   const [degrees, setDegrees] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [subjectSearch, setSubjectSearch] = useState('');
+  const [filteredSubjects, setFilteredSubjects] = useState([]);
+  const [showSubjectDropdown, setShowSubjectDropdown] = useState(false);
 
   // Fetch subjects and degrees on component mount
   useEffect(() => {
@@ -40,6 +43,7 @@ const PersonalDetailsForm = () => {
           if (apiResponse.status === "success" && Array.isArray(apiResponse.data)) {
             console.log('Setting subjects from API data:', apiResponse.data);
             setSubjects(apiResponse.data);
+            setFilteredSubjects(apiResponse.data);
           } else {
             console.error('Unexpected subjects API response format:', apiResponse);
             setErrors(prev => ({
@@ -95,6 +99,18 @@ const PersonalDetailsForm = () => {
 
     fetchData();
   }, []);
+
+  // Filter subjects based on search input
+  useEffect(() => {
+    if (subjectSearch.trim() === '') {
+      setFilteredSubjects(subjects);
+    } else {
+      const filtered = subjects.filter(subject => 
+        subject.name.toLowerCase().includes(subjectSearch.toLowerCase())
+      );
+      setFilteredSubjects(filtered);
+    }
+  }, [subjectSearch, subjects]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -154,6 +170,15 @@ const PersonalDetailsForm = () => {
         [name]: ''
       }));
     }
+  };
+
+  const handleSubjectSelect = (subjectId, subjectName) => {
+    setFormData(prev => ({
+      ...prev,
+      subject_id: subjectId
+    }));
+    setSubjectSearch(subjectName);
+    setShowSubjectDropdown(false);
   };
 
   const handleNext = async () => {
@@ -229,14 +254,13 @@ const PersonalDetailsForm = () => {
 
   return (
     <div className="min-h-screen w-screen bg-indigo-100 flex flex-col">
-      {/* Header */}
-      <header className="bg-[#4527a0] text-white p-4 flex items-center" style={{height: '201px' }}>
+      <header className="bg-[#4527a0] text-black p-4 flex items-center fixed top-0 left-0 right-0 z-10" style={{height: '100px' }}>
         <img 
-          src="/assets/LOGO (2).png" 
+          src="/assets/LOGO (1).png" 
           alt="Star Educators Logo"
           style={{
-            height: '78.24px',
-            width: '169.89px',
+            height: '50px',
+            width: '50px',
             position: 'relative',
             left: '69px',
             cursor: 'pointer'
@@ -246,7 +270,7 @@ const PersonalDetailsForm = () => {
       </header>
 
       {/* Form */}
-      <div className="flex-grow flex justify-center items-center">
+      <div className="flex-grow flex justify-center items-center" style={{marginTop: "100px"}}>
         <div className="w-full max-w-4xl bg-white p-8 rounded-lg shadow-md">
           <h1 className="text-3xl font-bold text-center mb-8 text-black">Educational Details</h1>
 
@@ -291,20 +315,47 @@ const PersonalDetailsForm = () => {
                 
                 <div>
                   <label className="block text-sm font-medium text-black">Subject Specialized In <span className="text-red-500">*</span></label>
-                  <select
-                    name="subject_id"
-                    value={formData.subject_id}
-                    onChange={handleInputChange}
-                    className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
-                      ${errors.subject_id ? 'border-red-500' : 'border-gray-300'}`}
-                  >
-                    <option value="">Choose</option>
-                    {subjects.map(subject => (
-                      <option key={subject.id} value={subject.id}>
-                        {subject.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <div 
+                      className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black cursor-pointer
+                        ${errors.subject_id ? 'border-red-500' : 'border-gray-300'}`}
+                      onClick={() => setShowSubjectDropdown(!showSubjectDropdown)}
+                    >
+                      {formData.subject_id ? 
+                        subjects.find(s => s.id.toString() === formData.subject_id.toString())?.name || 'Choose' : 
+                        'Choose'}
+                    </div>
+                    
+                    {showSubjectDropdown && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                        <div className="sticky top-0 bg-white p-2 border-b">
+                          <input
+                            type="text"
+                            placeholder="Search subjects..."
+                            value={subjectSearch}
+                            onChange={(e) => setSubjectSearch(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                        <div>
+                          {filteredSubjects.length > 0 ? (
+                            filteredSubjects.map(subject => (
+                              <div 
+                                key={subject.id} 
+                                className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-black"
+                                onClick={() => handleSubjectSelect(subject.id, subject.name)}
+                              >
+                                {subject.name}
+                              </div>
+                            ))
+                          ) : (
+                            <div className="px-4 py-2 text-gray-500">No subjects found</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   {errors.subject_id && <p className="mt-1 text-sm text-red-500">{errors.subject_id}</p>}
                 </div>
                 
@@ -348,9 +399,9 @@ const PersonalDetailsForm = () => {
                   {errors.universityName && <p className="mt-1 text-sm text-red-500">{errors.universityName}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-black">Year of Passing <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium text-black">Year of Passing (MM-YYYY) <span className="text-red-500">*</span></label>
                   <input
-                    type="date"
+                    type="month"
                     name="yearofPassing"
                     value={formData.yearofPassing}
                     onChange={handleInputChange}
@@ -390,7 +441,7 @@ const PersonalDetailsForm = () => {
               <div className="flex justify-between items-center mt-6">
                 <button
                   className="px-6 py-2 bg-gray-200 rounded-md hover:bg-gray-300 text-black"
-                  onClick={() => navigate('/details')}
+                  onClick={() => navigate('/personal_details_teacher')}
                   disabled={isSubmitting}
                 >
                   Back
@@ -407,6 +458,9 @@ const PersonalDetailsForm = () => {
           )}
         </div>
       </div>
+      <footer className="bg-[#4527a0] text-white py-4 text-center">
+        <p>For any technical issues, please contact: <a href="mailto:tech.star.educators@gmail.com" className="underline hover:text-indigo-200">tech.star.educators@gmail.com</a></p>
+      </footer>
     </div>
   );
 };
