@@ -50,7 +50,7 @@ const termsAndConditionsData = {
       items: [
         "Access, correct, or delete your data",
         "Withdraw consent for data usage",
-        "Opt out of communications at any time by contacting us at support@stareducators.com"
+        "Opt out of communications at any time by contacting us at tech.star.educators@gmail.com"
       ]
     },
     {

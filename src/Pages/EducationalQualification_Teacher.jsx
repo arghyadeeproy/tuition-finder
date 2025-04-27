@@ -12,6 +12,7 @@ const PersonalDetailsForm = () => {
     universityName: '',
     yearofPassing: '',
     EducationalQualification: '',
+    otherQualification: '',
     subject_id: '',
     certificate: null,
   });
@@ -25,6 +26,9 @@ const PersonalDetailsForm = () => {
   const [filteredSubjects, setFilteredSubjects] = useState([]);
   const [showSubjectDropdown, setShowSubjectDropdown] = useState(false);
 
+  // Add a constant for the "Other" value
+  const OTHER_QUALIFICATION_VALUE = 'other';
+
   // Fetch subjects and degrees on component mount
   useEffect(() => {
     const fetchData = async () => {
@@ -32,27 +36,18 @@ const PersonalDetailsForm = () => {
       try {
         // Fetch subjects
         const subjectsResponse = await subjectService.getSubjects();
-        console.log('Subjects response:', subjectsResponse);
-        
-        // Handle Axios response structure - check if it's wrapped in data property
         if (subjectsResponse && subjectsResponse.data) {
-          // Extract the actual API response from Axios wrapper
           const apiResponse = subjectsResponse.data;
-          
-          // Now check the API response structure
           if (apiResponse.status === "success" && Array.isArray(apiResponse.data)) {
-            console.log('Setting subjects from API data:', apiResponse.data);
             setSubjects(apiResponse.data);
             setFilteredSubjects(apiResponse.data);
           } else {
-            console.error('Unexpected subjects API response format:', apiResponse);
             setErrors(prev => ({
               ...prev,
               general: "Error loading subjects. Please refresh and try again."
             }));
           }
         } else {
-          console.error('Invalid subjects response:', subjectsResponse);
           setErrors(prev => ({
             ...prev,
             general: "Error loading subjects. Please refresh and try again."
@@ -61,33 +56,23 @@ const PersonalDetailsForm = () => {
 
         // Fetch degrees
         const degreesResponse = await educationalQualificationService.getDegrees();
-        console.log('Degrees response:', degreesResponse);
-        
-        // Handle Axios response structure for degrees
         if (degreesResponse && degreesResponse.data) {
-          // Extract the actual API response data
           const apiResponse = degreesResponse.data;
-          
-          // Check if we have an array of degrees
           if (Array.isArray(apiResponse.data)) {
-            console.log('Setting degrees from API data:', apiResponse.data);
             setDegrees(apiResponse.data);
           } else {
-            console.error('Unexpected degree API response format:', apiResponse);
             setErrors(prev => ({
               ...prev,
               general: "Error loading degrees. Please refresh and try again."
             }));
           }
         } else {
-          console.error('Invalid degrees response:', degreesResponse);
           setErrors(prev => ({
             ...prev,
             general: "Error loading degrees. Please refresh and try again."
           }));
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
         setErrors(prev => ({
           ...prev,
           general: "Error loading data. Please check your connection and try again."
@@ -117,6 +102,8 @@ const PersonalDetailsForm = () => {
     
     if (!formData.EducationalQualification) {
       newErrors.EducationalQualification = 'Please select your educational qualification';
+    } else if (formData.EducationalQualification === OTHER_QUALIFICATION_VALUE && !formData.otherQualification.trim()) {
+      newErrors.otherQualification = 'Please specify your educational qualification';
     }
     
     if (!formData.subject_id) {
@@ -145,7 +132,6 @@ const PersonalDetailsForm = () => {
       }
     }
     
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -162,12 +148,26 @@ const PersonalDetailsForm = () => {
         ...prev,
         [name]: value
       }));
+      // If user changes the qualification dropdown, and selects something other than "Other", clear otherQualification
+      if (name === "EducationalQualification" && value !== OTHER_QUALIFICATION_VALUE) {
+        setFormData(prev => ({
+          ...prev,
+          otherQualification: ''
+        }));
+      }
     }
     
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
         [name]: ''
+      }));
+    }
+    // If user starts typing in otherQualification, clear error
+    if (name === "otherQualification" && errors.otherQualification) {
+      setErrors(prev => ({
+        ...prev,
+        otherQualification: ''
       }));
     }
   };
@@ -190,7 +190,6 @@ const PersonalDetailsForm = () => {
         const teacherId = localStorage.getItem('teacher_id');
         
         if (!teacherId) {
-          console.error("Teacher ID not found in localStorage");
           setErrors({
             general: "Teacher ID not found. Please complete personal details first."
           });
@@ -199,20 +198,26 @@ const PersonalDetailsForm = () => {
         }
         
         // Get the degree ID and subject ID from the form values
-        const degreeId = parseInt(formData.EducationalQualification);
+        let degreeId = formData.EducationalQualification;
+        let degreeName = '';
+        if (degreeId === OTHER_QUALIFICATION_VALUE) {
+          degreeId = null;
+          degreeName = formData.otherQualification.trim();
+        } else {
+          degreeId = parseInt(degreeId);
+        }
         const subjectId = parseInt(formData.subject_id);
         
         // Format the qualification data
         const qualificationData = {
           degree_id: degreeId,
+          degree_name: degreeName,
           subject_id: subjectId,
           yearofPassing: educationalQualificationService.formatYearOfPassing(formData.yearofPassing),
           schoolName: formData.schoolName,
           collegeName: formData.collegeName,
           universityName: formData.universityName
         };
-        
-        console.log('Submitting qualification data:', qualificationData);
         
         // Submit the qualification
         await educationalQualificationService.createTeacherQualification(
@@ -223,7 +228,6 @@ const PersonalDetailsForm = () => {
         // Navigate to the next page
         navigate('/teachersubject');
       } catch (error) {
-        console.error('Error submitting educational qualification:', error);
         setErrors({
           general: "Error submitting educational qualification. Please try again."
         });
@@ -309,8 +313,23 @@ const PersonalDetailsForm = () => {
                         {degree.name}
                       </option>
                     ))}
+                    <option value={OTHER_QUALIFICATION_VALUE}>Other</option>
                   </select>
+                  {formData.EducationalQualification === OTHER_QUALIFICATION_VALUE && (
+                    <input
+                      type="text"
+                      name="otherQualification"
+                      value={formData.otherQualification}
+                      onChange={handleInputChange}
+                      placeholder="Please specify your qualification"
+                      className={`mt-2 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
+                        ${errors.otherQualification ? 'border-red-500' : 'border-gray-300'}`}
+                    />
+                  )}
                   {errors.EducationalQualification && <p className="mt-1 text-sm text-red-500">{errors.EducationalQualification}</p>}
+                  {formData.EducationalQualification === OTHER_QUALIFICATION_VALUE && errors.otherQualification && (
+                    <p className="mt-1 text-sm text-red-500">{errors.otherQualification}</p>
+                  )}
                 </div>
                 
                 <div>
@@ -410,32 +429,6 @@ const PersonalDetailsForm = () => {
                   />
                   {errors.yearofPassing && <p className="mt-1 text-sm text-red-500">{errors.yearofPassing}</p>}
                 </div>
-                {/* <div>
-                  <label className="block text-sm font-medium text-black">Latest Degree/Certificate <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <input
-                      type="file"
-                      name="certificate"
-                      onChange={handleInputChange}
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                      className="hidden"
-                      id="certificate-input"
-                    />
-                    <label
-                      htmlFor="certificate-input" 
-                      className={`mt-1 flex items-center w-full px-3 py-2 border rounded-md cursor-pointer text-black
-                        ${errors.certificate ? 'border-red-500' : 'border-gray-300'}`}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                      </svg>
-                      <span className="text-gray-500">
-                        {formData.certificate ? formData.certificate.name : 'Click to attach file'}
-                      </span>
-                    </label>
-                  </div>
-                  <p className="mt-1 text-xs text-black">* File will be stored locally for now</p>
-                </div> */}
                 
               </div>
               <div className="flex justify-between items-center mt-6">

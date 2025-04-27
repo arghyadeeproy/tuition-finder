@@ -15,6 +15,7 @@ export const educationalQualificationService = {
       "teacher_educational_qualification": {
         // "teacher_id": teacherId,
         "degree_id": qualificationData.degree_id,
+        "degree_name": qualificationData.degree_name,
         "subject_id": qualificationData.subject_id,
         "year_of_passing": qualificationData.yearofPassing,
         "school_name": qualificationData.schoolName,
@@ -31,6 +32,7 @@ export const educationalQualificationService = {
     const formattedData = {
       "teacher_educational_qualification": {
         "degree_id": qualificationData.degree_id,
+        "degree_name": qualificationData.degree_name,
         "subject_id": qualificationData.subject_id,
         "year_of_passing": qualificationData.yearofPassing,
         "school_name": qualificationData.schoolName,
@@ -46,20 +48,44 @@ export const educationalQualificationService = {
   deleteTeacherQualification: (qualificationId) => 
     api.delete(`/api/v1/teacher_educational_qualifications/${qualificationId}`),
     
-  // Format date from YYYY-MM-DD to DD-MM-YYYY
+  // Format date from YYYY-MM-DD or YYYY-MM or YYYY to MM/YYYY
   formatYearOfPassing: (dateString) => {
     if (!dateString) return "";
-    
-    // Check if the date is already in the expected format
-    if (dateString.includes('-') && dateString.split('-')[0].length === 2) return dateString;
-    
+
+    // If already in mm/yyyy format, return as is
+    if (/^\d{2}\/\d{4}$/.test(dateString)) return dateString;
+
     try {
-      const date = new Date(dateString);
-      const day = String(date.getDate()).padStart(2, '0');
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const year = date.getFullYear();
-      
-      return `${day}-${month}-${year}`;
+      // Handle YYYY-MM-DD, YYYY-MM, or YYYY
+      let year = "";
+      let month = "01"; // Default to January if not provided
+
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        // YYYY-MM-DD
+        const [y, m] = dateString.split('-');
+        year = y;
+        month = m;
+      } else if (/^\d{4}-\d{2}$/.test(dateString)) {
+        // YYYY-MM
+        const [y, m] = dateString.split('-');
+        year = y;
+        month = m;
+      } else if (/^\d{4}$/.test(dateString)) {
+        // YYYY
+        year = dateString;
+        month = "01";
+      } else {
+        // Try to parse as Date
+        const date = new Date(dateString);
+        if (!isNaN(date.getTime())) {
+          year = String(date.getFullYear());
+          month = String(date.getMonth() + 1).padStart(2, '0');
+        } else {
+          return dateString;
+        }
+      }
+
+      return `${month}/${year}`;
     } catch (e) {
       console.error('Error formatting date:', e);
       return dateString;

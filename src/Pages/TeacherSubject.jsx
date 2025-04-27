@@ -17,7 +17,7 @@ export default function TuitionFinderForm() {
     teachOnline: false, // Disabled online teaching
     teachOffline: true, // Default to offline
     teachingMedium: "Bengali", // Default value
-    resume: null
+    mark_sheet: null // Use undefined instead of null
   });
   
   const [subjects, setSubjects] = useState([]);
@@ -112,7 +112,7 @@ export default function TuitionFinderForm() {
       
       setFormData({
         ...formData,
-        resume: file
+        mark_sheet: file
       });
     }
   };
@@ -184,8 +184,8 @@ export default function TuitionFinderForm() {
       return;
     }
     
-    if (!formData.resume) {
-      setSubmitError("Please upload your CV");
+    if (!formData.mark_sheet) {
+      setSubmitError("Please upload your Marksheet");
       return;
     }
     
@@ -207,6 +207,7 @@ export default function TuitionFinderForm() {
       return;
     }
     
+    // Don't send mark_sheet if not present (undefined), and don't send null
     const teacherPreferenceRequest = {
       teaching_radius_km: parseInt(formData.radius) || 10,
       preferred_teaching_type: "individual",
@@ -218,7 +219,7 @@ export default function TuitionFinderForm() {
       special_attention_children: formData.teachSpecialChild,
       subject_ids: formData.selectedSubjects.map(id => parseInt(id)),
       preferred_medium: getPreferredMedium(formData.teachingMedium),
-      resume: formData.resume,
+      ...(formData.mark_sheet !== undefined ? { mark_sheet: formData.mark_sheet } : {})
     };
     
     try {
@@ -227,7 +228,6 @@ export default function TuitionFinderForm() {
       // Submit the form data to the API
       const response = await teacherService.createTeacherPreferences(teacherId, teacherPreferenceRequest);
       console.log("Response from server:", response);
-      
       
       // Navigate to /slots after successful submission
       navigate('/slots');
@@ -239,7 +239,7 @@ export default function TuitionFinderForm() {
   };
 
   const handleBack = () => {
-    navigate('/personal_details_teacher2');
+    navigate('/educational_details_teacher');
   };
 
   return (
@@ -449,7 +449,7 @@ export default function TuitionFinderForm() {
                   </div>
                 </div>
 
-                {/* Teaching Radius - Changed to slider */}
+                {/* Teaching Radius - Changed to slider with colored background */}
                 <div className="mt-6">
                   <label className="text-sm text-black block mb-2">I teach within radius (in KMs) <span className="text-red-500">*</span></label>
                   <div className="flex flex-col space-y-2">
@@ -462,7 +462,10 @@ export default function TuitionFinderForm() {
                       max="50"
                       step="1"
                       required
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      style={{
+                        background: `linear-gradient(90deg, #6366f1 ${(formData.radius/50)*100}%, #e5e7eb ${(formData.radius/50)*100}%)`
+                      }}
+                      className="w-full h-[4px] rounded-lg appearance-none cursor-pointer focus:outline-none slider-colored"
                     />
                     <div className="flex justify-between">
                       <span className="text-xs text-gray-500">0 KM</span>
@@ -470,6 +473,80 @@ export default function TuitionFinderForm() {
                       <span className="text-xs text-gray-500">50 KM</span>
                     </div>
                   </div>
+                  {/* Custom styles for the range slider thumb and track */}
+                  <style>
+                    {`
+                      input[type="range"].slider-colored {
+                        outline: none;
+                        vertical-align: middle;
+                        margin: 0;
+                        padding: 0;
+                        /* Make the bar thinner */
+                        height: 20px;
+                      }
+                      input[type="range"].slider-colored::-webkit-slider-thumb {
+                        -webkit-appearance: none;
+                        appearance: none;
+                        width: 20px;
+                        height: 20px;
+                        border-radius: 50%;
+                        background: #6366f1;
+                        border: 2px solid #fff;
+                        box-shadow: 0 0 2px rgba(0,0,0,0.2);
+                        cursor: pointer;
+                        transition: background 0.2s;
+                        margin-top: -8px; /* Center the thumb on a 4px track */
+                      }
+                      input[type="range"].slider-colored::-webkit-slider-runnable-track {
+                        height: 4px;
+                        border-radius: 2px;
+                        background: transparent;
+                      }
+                      input[type="range"].slider-colored:focus {
+                        outline: none;
+                      }
+                      /* Firefox */
+                      input[type="range"].slider-colored::-moz-range-thumb {
+                        width: 20px;
+                        height: 20px;
+                        border-radius: 50%;
+                        background: #6366f1;
+                        border: 2px solid #fff;
+                        box-shadow: 0 0 2px rgba(0,0,0,0.2);
+                        cursor: pointer;
+                        transition: background 0.2s;
+                      }
+                      input[type="range"].slider-colored::-moz-range-track {
+                        height: 4px;
+                        border-radius: 2px;
+                        background: transparent;
+                      }
+                      input[type="range"].slider-colored::-moz-focus-outer {
+                        border: 0;
+                      }
+                      /* IE */
+                      input[type="range"].slider-colored::-ms-thumb {
+                        width: 20px;
+                        height: 20px;
+                        border-radius: 50%;
+                        background: #6366f1;
+                        border: 2px solid #fff;
+                        box-shadow: 0 0 2px rgba(0,0,0,0.2);
+                        cursor: pointer;
+                        transition: background 0.2s;
+                        margin-top: 0px;
+                      }
+                      input[type="range"].slider-colored::-ms-fill-lower {
+                        background: transparent;
+                      }
+                      input[type="range"].slider-colored::-ms-fill-upper {
+                        background: transparent;
+                      }
+                      input[type="range"].slider-colored {
+                        height: 7px;
+                      }
+                    `}
+                  </style>
                 </div>
 
                 {/* School Teaching */}
@@ -529,9 +606,9 @@ export default function TuitionFinderForm() {
                     {fileError}
                   </div>
                 )}
-                {formData.resume && !fileError && (
+                {formData.mark_sheet && !fileError && (
                   <div className="text-sm text-green-600 mt-1">
-                    File selected: {formData.resume.name}
+                    File selected: {formData.mark_sheet.name}
                   </div>
                 )}
                 <div className="text-xs text-gray-500 mt-1">
