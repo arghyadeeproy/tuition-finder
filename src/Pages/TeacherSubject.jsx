@@ -264,7 +264,7 @@ export default function TuitionFinderForm() {
 
       {/* Form Card - Centered and takes up most of the screen */}
       <div className="flex-1 flex justify-center items-start overflow-auto py-4">
-        <div className="w-full max-w-5xl mx-6 -mt-6 rounded-lg bg-white shadow-lg p-6">
+        <div className="w-full max-w-5xl mx-6 -mt-6 rounded-lg bg-white shadow-lg p-6 relative">
           <h2 className="text-2xl font-bold mb-8 text-black">Teaching Preferences</h2>
 
           {/* Show submission error if any */}
@@ -283,7 +283,7 @@ export default function TuitionFinderForm() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6" id="teacher-preferences-form">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Left column */}
               <div className="space-y-6">
@@ -646,8 +646,8 @@ export default function TuitionFinderForm() {
               </div>
             </div>
 
-            {/* Form Navigation */}
-            <div className="flex justify-center pt-4 space-x-4 mt-8">
+            {/* Form Navigation - buttons in bottom left/right of white container, no tick mark */}
+            <div className="w-full flex justify-between items-center mt-8 absolute left-0 right-0 bottom-0 px-6 pb-6">
               <button 
                 type="button" 
                 className="border border-indigo-800 text-indigo-800 dark:text-white dark:border-white px-8 py-2 rounded-full flex items-center"
@@ -658,13 +658,15 @@ export default function TuitionFinderForm() {
                 </svg>
                 Back
               </button>
-              <button type="submit" className="bg-indigo-800 text-white px-8 py-2 rounded-full flex items-center">
+              <button 
+                type="submit" 
+                className="bg-indigo-800 text-white px-8 py-2 rounded-full flex items-center"
+              >
                 Next
-                <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                </svg>
               </button>
             </div>
+            {/* Add padding to bottom so content is not hidden behind buttons */}
+            <div className="pb-20"></div>
           </form>
         </div>
       </div>

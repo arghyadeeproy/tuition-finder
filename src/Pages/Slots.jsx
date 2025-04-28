@@ -178,7 +178,7 @@ const Slots = () => {
 
       {/* Main Content - Centered */}
       <div className="flex-1 flex items-center justify-center px-4">
-        <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-4xl">
+        <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-4xl flex flex-col items-center">
           <h2 className="text-2xl font-bold mb-6 text-gray-900">Date & Time</h2>
           <p className="text-gray-600 mb-6">Choose Days and time you prefer to teach</p>
           
@@ -194,49 +194,55 @@ const Slots = () => {
             </div>
           )}
           
-          <div className="space-y-4">
-            {days.map(day => (
-              <div key={day} className="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-4">
-                <div className="w-full md:w-32">
-                  <button 
-                    onClick={() => handleDaySelect(day)}
-                    className={`px-2 py-1 md:px-4 md:py-2 rounded-full w-full transition-colors ${
-                      selectedSlots[day] 
-                        ? 'bg-[#D8D9FF] text-gray-900' 
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
-                  >
-                    {day}
-                  </button>
+          {/* Center the days/times selection */}
+          <div className="flex flex-col items-center justify-center w-full">
+            <div className="space-y-4 w-full flex flex-col items-center">
+              {days.map(day => (
+                <div
+                  key={day}
+                  className="flex flex-col md:flex-row items-center justify-center space-y-2 md:space-y-0 md:space-x-4 w-full"
+                >
+                  <div className="w-full md:w-32 flex justify-center">
+                    <button 
+                      onClick={() => handleDaySelect(day)}
+                      className={`px-2 py-1 md:px-4 md:py-2 rounded-full w-full md:w-auto transition-colors ${
+                        selectedSlots[day] 
+                          ? 'bg-[#D8D9FF] text-gray-900' 
+                          : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
+                      {day}
+                    </button>
+                  </div>
+                  
+                  <div className="flex flex-wrap justify-center md:justify-center space-x-2">
+                    {times.map(time => {
+                      const isDaySelected = !!selectedSlots[day];
+                      return (
+                        <button
+                          key={`${day}-${time}`}
+                          onClick={() => handleTimeSelect(day, time)}
+                          className={`px-2 py-1 md:px-4 md:py-2 rounded-full transition-colors ${
+                            selectedTimes[`${day}-${time}`] && isDaySelected
+                              ? 'bg-[#D8D9FF] text-gray-900'
+                              : 'bg-gray-100 text-gray-800'
+                          } ${!isDaySelected ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          disabled={!isDaySelected}
+                          tabIndex={isDaySelected ? 0 : -1}
+                          aria-disabled={!isDaySelected}
+                        >
+                          {time}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                
-                <div className="flex flex-wrap justify-center md:justify-start space-x-2">
-                  {times.map(time => {
-                    const isDaySelected = !!selectedSlots[day];
-                    return (
-                      <button
-                        key={`${day}-${time}`}
-                        onClick={() => handleTimeSelect(day, time)}
-                        className={`px-2 py-1 md:px-4 md:py-2 rounded-full transition-colors ${
-                          selectedTimes[`${day}-${time}`] && isDaySelected
-                            ? 'bg-[#D8D9FF] text-gray-900'
-                            : 'bg-gray-100 text-gray-800'
-                        } ${!isDaySelected ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        disabled={!isDaySelected}
-                        tabIndex={isDaySelected ? 0 : -1}
-                        aria-disabled={!isDaySelected}
-                      >
-                        {time}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
           {/* Navigation Buttons */}
-          <div className="flex justify-between mt-8">
+          <div className="flex justify-between mt-8 w-full">
             <button className="flex items-center px-6 py-2 text-gray-700 hover:text-gray-900" onClick={() => navigate('/teacherSubject')}>
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
