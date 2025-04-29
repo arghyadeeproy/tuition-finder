@@ -245,26 +245,24 @@ export default function TuitionFinderForm() {
   return (
     <div className="fixed inset-0 bg-indigo-50 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="w-full bg-indigo-800 py-6 px-6 relative">
-        <div className="flex items-center">
-          <div className="text-white flex items-center">
-            <svg className="w-8 h-8 mr-2" viewBox="0 0 24 24" fill="white">
-              <path d="M21,5c-1.11-0.35-2.33-0.5-3.5-0.5c-1.95,0-4.05,0.4-5.5,1.5c-1.45-1.1-3.55-1.5-5.5-1.5S2.45,4.9,1,6v14.65 c0,0.25,0.25,0.5,0.5,0.5c0.1,0,0.15-0.05,0.25-0.05C3.1,20.45,5.05,20,6.5,20c1.95,0,4.05,0.4,5.5,1.5c1.35-0.85,3.8-1.5,5.5-1.5 c1.65,0,3.35,0.3,4.75,1.05c0.1,0.05,0.15,0.05,0.25,0.05c0.25,0,0.5-0.25,0.5-0.5V6C22.4,5.55,21.75,5.25,21,5z M21,18.5 c-1.1-0.35-2.3-0.5-3.5-0.5c-1.7,0-4.15,0.65-5.5,1.5V8c1.35-0.85,3.8-1.5,5.5-1.5c1.2,0,2.4,0.15,3.5,0.5V18.5z" />
-            </svg>
-            <span className="text-2xl font-bold">Teacher Preferences</span>
-          </div>
-        </div>
-        {/* Background decoration */}
-        <div className="absolute right-6 top-0 h-full opacity-20">
-          <svg className="h-full" viewBox="0 0 100 100" fill="white">
-            <path d="M50,5 C70,15 95,25 95,50 C95,75 70,85 50,95 C30,85 5,75 5,50 C5,25 30,15 50,5 Z" />
-          </svg>
-        </div>
-      </div>
+      <header className="bg-[#4527a0] text-black p-4 flex items-center fixed top-0 left-0 right-0 z-10" style={{height: '100px' }}>
+        <img 
+          src="/assets/LOGO (1).png" 
+          alt="Star Educators Logo"
+          style={{
+            height: '50px',
+            width: '50px',
+            position: 'relative',
+            left: '69px',
+            cursor: 'pointer'
+          }}
+          onClick={() => navigate('/')}
+        />
+      </header>
 
       {/* Form Card - Centered and takes up most of the screen */}
-      <div className="flex-1 flex justify-center items-start overflow-auto py-4">
-        <div className="w-full max-w-5xl mx-6 -mt-6 rounded-lg bg-white shadow-lg p-6 relative">
+      <div className="flex-1 flex justify-center items-start overflow-auto py-4" style={{ marginTop: '100px' }}>
+        <div className="w-full max-w-5xl mx-6 rounded-lg bg-white shadow-lg p-6 relative">
           <h2 className="text-2xl font-bold mb-8 text-black">Teaching Preferences</h2>
 
           {/* Show submission error if any */}
@@ -307,7 +305,7 @@ export default function TuitionFinderForm() {
                         >
                           <div className="flex flex-wrap gap-1">
                             {formData.selectedSubjects.length === 0 ? (
-                              <span className="text-black">Select subjects...</span>
+                              <span className="text-black">Select subjects</span>
                             ) : (
                               subjects
                                 .filter(subject => formData.selectedSubjects.includes(subject.id?.toString()))

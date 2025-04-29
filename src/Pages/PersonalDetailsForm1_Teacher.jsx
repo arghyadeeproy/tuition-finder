@@ -836,7 +836,6 @@ const PersonalDetailsForm = () => {
                   />
                 </div>
                 {errors.latitude && <p className="mt-1 text-sm text-red-500">{errors.latitude}</p>}
-                <p className="mt-1 text-xs text-gray-500">Must be between -90 and 90 (e.g., 28.6139)</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-black">Longitude</label>
@@ -853,7 +852,6 @@ const PersonalDetailsForm = () => {
                   />
                 </div>
                 {errors.longitude && <p className="mt-1 text-sm text-red-500">{errors.longitude}</p>}
-                <p className="mt-1 text-xs text-gray-500">Must be between -180 and 180 (e.g., 77.2090)</p>
               </div>
             </div>
             

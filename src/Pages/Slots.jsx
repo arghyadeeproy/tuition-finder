@@ -196,11 +196,11 @@ const Slots = () => {
           
           {/* Center the days/times selection */}
           <div className="flex flex-col items-center justify-center w-full">
-            <div className="space-y-4 w-full flex flex-col items-center">
+            <div className="space-y-6 w-full flex flex-col items-center">
               {days.map(day => (
                 <div
                   key={day}
-                  className="flex flex-col md:flex-row items-center justify-center space-y-2 md:space-y-0 md:space-x-4 w-full"
+                  className="flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-8 w-full"
                 >
                   <div className="w-full md:w-32 flex justify-center">
                     <button 
@@ -215,7 +215,7 @@ const Slots = () => {
                     </button>
                   </div>
                   
-                  <div className="flex flex-wrap justify-center md:justify-center space-x-2">
+                  <div className="flex flex-wrap justify-center md:justify-center space-x-4">
                     {times.map(time => {
                       const isDaySelected = !!selectedSlots[day];
                       return (
