@@ -16,26 +16,23 @@ export default function TuitionFinderForm() {
     selectedSubjects: [],
     teachOnline: false, // Disabled online teaching
     teachOffline: true, // Default to offline
-    teachingMedium: "Bengali", // Default value
+    selectedMediums: [],
     mark_sheet: null // Use undefined instead of null
   });
-  
+
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [submitError, setSubmitError] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [mediumDropdownOpen, setMediumDropdownOpen] = useState(false);
   const [fileError, setFileError] = useState(null);
 
   // Teaching medium options
   const teachingMediumOptions = [
-    "English, Hindi & Bengali",
     "English",
     "Hindi",
-    "Bengali",
-    "English & Hindi",
-    "English & Bengali",
-    "Hindi & Bengali"
+    "Bengali"
   ];
 
   useEffect(() => {
@@ -44,12 +41,12 @@ export default function TuitionFinderForm() {
       try {
         setLoading(true);
         const response = await subjectService.getSubjects();
-        
+
         // Check the structure of the response and extract the subjects array
-        const subjectsData = Array.isArray(response.data) 
-          ? response.data 
+        const subjectsData = Array.isArray(response.data)
+          ? response.data
           : (response.data.subjects || response.data.data || []);
-        
+
         if (!Array.isArray(subjectsData)) {
           console.error('Invalid subjects data format:', response.data);
           setError('Invalid subject data format received from the server.');
@@ -76,13 +73,16 @@ export default function TuitionFinderForm() {
       if (dropdownOpen && !event.target.closest('.subject-dropdown')) {
         setDropdownOpen(false);
       }
+      if (mediumDropdownOpen && !event.target.closest('.medium-dropdown')) {
+        setMediumDropdownOpen(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [dropdownOpen]);
+  }, [dropdownOpen, mediumDropdownOpen]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -96,20 +96,20 @@ export default function TuitionFinderForm() {
     setFileError(null);
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      
+
       // Check file type
       const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
       if (!validTypes.includes(file.type)) {
         setFileError('Please upload only JPG, JPEG or PNG files');
         return;
       }
-      
+
       // Check file size (500KB = 512000 bytes)
       if (file.size > 512000) {
         setFileError('File size must be less than 500KB');
         return;
       }
-      
+
       setFormData({
         ...formData,
         mark_sheet: file
@@ -129,7 +129,7 @@ export default function TuitionFinderForm() {
       const updatedSubjects = prevData.selectedSubjects.includes(subjectId)
         ? prevData.selectedSubjects.filter(id => id !== subjectId)
         : [...prevData.selectedSubjects, subjectId];
-      
+
       return {
         ...prevData,
         selectedSubjects: updatedSubjects
@@ -138,23 +138,13 @@ export default function TuitionFinderForm() {
   };
 
   // Helper function to convert UI medium selection to API format
-  const getPreferredMedium = (medium) => {
-    const mediums = [];
-    
-    if (medium.toLowerCase().includes("english")) {
-      mediums.push("english");
+  const getPreferredMedium = (mediums) => {
+    // mediums is now an array of strings
+    if (!Array.isArray(mediums) || mediums.length === 0) {
+      return ["english"];
     }
-    
-    if (medium.toLowerCase().includes("hindi")) {
-      mediums.push("hindi");
-    }
-    
-    if (medium.toLowerCase().includes("bengali")) {
-      mediums.push("bengali");
-    }
-    
-    // Return array of mediums 
-    return mediums.length > 0 ? mediums : ["english"];
+    // Lowercase and deduplicate
+    return Array.from(new Set(mediums.map(m => m.toLowerCase())));
   };
 
   // Helper function to determine mode of teaching based on checkboxes
@@ -169,44 +159,62 @@ export default function TuitionFinderForm() {
     return "offline"; // Default fallback
   };
 
+  // Handle multi-select for teaching mediums
+  const handleMediumChange = (medium) => {
+    setFormData(prevData => {
+      const updatedMediums = prevData.selectedMediums.includes(medium)
+        ? prevData.selectedMediums.filter(m => m !== medium)
+        : [...prevData.selectedMediums, medium];
+      return {
+        ...prevData,
+        selectedMediums: updatedMediums
+      };
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitError(null);
-    
+
     // Validate form data before submission - all fields are mandatory
     if (formData.selectedSubjects.length === 0) {
       setSubmitError("Please select at least one subject");
       return;
     }
-    
+
     if (!formData.teachOffline) {
       setSubmitError("Offline teaching mode is required");
       return;
     }
-    
+
     if (!formData.mark_sheet) {
       setSubmitError("Please upload your Marksheet");
       return;
     }
-    
+
     if (!formData.radius || formData.radius === "0") {
       setSubmitError("Please specify a valid teaching radius");
       return;
     }
-    
+
     if (!formData.experience) {
       setSubmitError("Please specify your teaching experience");
       return;
     }
-    
+
+    if (!formData.selectedMediums || formData.selectedMediums.length === 0) {
+      setSubmitError("Please select at least one medium of teaching");
+      return;
+    }
+
     // Prepare the data for teacher_preferences API submission
     const teacherId = localStorage.getItem('teacher_id');
-    
+
     if (!teacherId) {
       setSubmitError("Teacher ID not found. Please ensure you're logged in properly.");
       return;
     }
-    
+
     // Don't send mark_sheet if not present (undefined), and don't send null
     const teacherPreferenceRequest = {
       teaching_radius_km: parseInt(formData.radius) || 10,
@@ -218,20 +226,20 @@ export default function TuitionFinderForm() {
       special_need_children: formData.trainedSpecialChild,
       special_attention_children: formData.teachSpecialChild,
       subject_ids: formData.selectedSubjects.map(id => parseInt(id)),
-      preferred_medium: getPreferredMedium(formData.teachingMedium),
+      preferred_medium: getPreferredMedium(formData.selectedMediums),
       ...(formData.mark_sheet !== undefined ? { mark_sheet: formData.mark_sheet } : {})
     };
-    
+
     try {
       console.log("Submitting request:", JSON.stringify(teacherPreferenceRequest, null, 2));
-      
+
       // Submit the form data to the API
       const response = await teacherService.createTeacherPreferences(teacherId, teacherPreferenceRequest);
       console.log("Response from server:", response);
-      
+
       // Navigate to /slots after successful submission
       navigate('/slots');
-      
+
     } catch (error) {
       console.error('Error submitting form:', error);
       setSubmitError(error.message || 'There was an error submitting your request. Please try again.');
@@ -246,8 +254,8 @@ export default function TuitionFinderForm() {
     <div className="fixed inset-0 bg-indigo-50 flex flex-col overflow-hidden">
       {/* Header */}
       <header className="bg-[#4527a0] text-black p-4 flex items-center fixed top-0 left-0 right-0 z-10" style={{height: '100px' }}>
-        <img 
-          src="/assets/LOGO (1).png" 
+        <img
+          src="/assets/LOGO (1).png"
           alt="Star Educators Logo"
           style={{
             height: '50px',
@@ -299,7 +307,7 @@ export default function TuitionFinderForm() {
                       </div>
                     ) : (
                       <div className="w-full">
-                        <div 
+                        <div
                           className="w-full border border-gray-300 rounded p-2 text-black flex justify-between items-center cursor-pointer bg-white"
                           onClick={() => setDropdownOpen(!dropdownOpen)}
                         >
@@ -320,15 +328,15 @@ export default function TuitionFinderForm() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                           </svg>
                         </div>
-                        
+
                         {dropdownOpen && (
                           <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-60 overflow-y-auto">
                             {subjects.length === 0 ? (
                               <div className="p-2 text-black">No subjects available</div>
                             ) : (
                               subjects.map((subject) => (
-                                <div 
-                                  key={subject.id} 
+                                <div
+                                  key={subject.id}
                                   className="p-2 hover:bg-indigo-50 cursor-pointer flex items-center"
                                   onClick={() => handleSubjectChange(subject.id?.toString())}
                                 >
@@ -366,26 +374,51 @@ export default function TuitionFinderForm() {
                   />
                 </div>
 
-                {/* Teaching Medium - Updated with proper dropdown */}
+                {/* Teaching Medium - Multi-select Dropdown */}
                 <div className="mt-6">
                   <label className="text-sm text-black block mb-2">Medium of Teaching <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <select 
-                      name="teachingMedium"
-                      value={formData.teachingMedium}
-                      onChange={handleChange}
-                      required
-                      className="w-full border border-gray-300 rounded p-2 pr-8 appearance-none text-black"
+                  <div className="relative medium-dropdown">
+                    <div
+                      className="w-full border border-gray-300 rounded p-2 text-black flex justify-between items-center cursor-pointer bg-white"
+                      onClick={() => setMediumDropdownOpen(!mediumDropdownOpen)}
                     >
-                      {teachingMediumOptions.map((option, index) => (
-                        <option key={index} value={option}>{option}</option>
-                      ))}
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                      <svg className="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="flex flex-wrap gap-1">
+                        {formData.selectedMediums.length === 0 ? (
+                          <span className="text-black">Select mediums</span>
+                        ) : (
+                          formData.selectedMediums.map((medium) => (
+                            <span key={medium} className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-sm">
+                              {medium}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                      <svg className={`w-4 h-4 text-black transition-transform ${mediumDropdownOpen ? 'transform rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
+                    {mediumDropdownOpen && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-60 overflow-y-auto">
+                        {teachingMediumOptions.map((medium) => (
+                          <div
+                            key={medium}
+                            className="p-2 hover:bg-indigo-50 cursor-pointer flex items-center"
+                            onClick={() => handleMediumChange(medium)}
+                          >
+                            <input
+                              type="checkbox"
+                              className="form-checkbox h-4 w-4 text-indigo-600 mr-2"
+                              checked={formData.selectedMediums.includes(medium)}
+                              onChange={() => {}}
+                            />
+                            <span className="text-black">{medium}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-xs text-black mt-1">
+                      Click to open dropdown and select multiple mediums
+                    </p>
                   </div>
                 </div>
 
@@ -579,16 +612,16 @@ export default function TuitionFinderForm() {
                 {/* Document Upload - Updated with file type restrictions */}
                 <div className="mt-6 flex items-center justify-between">
                   <p className="text-sm text-black">Attach your Marksheet of 12  <span className="text-red-500">*</span></p>
-                  <input 
-                    type="file" 
+                  <input
+                    type="file"
                     ref={fileInputRef}
                     onChange={handleFileChange}
                     accept=".jpg,.jpeg,.png"
-                    className="hidden" 
+                    className="hidden"
                     required
                   />
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="bg-indigo-800 text-white px-4 py-2 rounded-md flex items-center"
                     onClick={() => fileInputRef.current.click()}
                   >
@@ -646,8 +679,8 @@ export default function TuitionFinderForm() {
 
             {/* Form Navigation - buttons in bottom left/right of white container, no tick mark */}
             <div className="w-full flex justify-between items-center mt-8 absolute left-0 right-0 bottom-0 px-6 pb-6">
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="border border-indigo-800 text-indigo-800 dark:text-white dark:border-white px-8 py-2 rounded-full flex items-center"
                 onClick={handleBack}
               >
@@ -656,8 +689,8 @@ export default function TuitionFinderForm() {
                 </svg>
                 Back
               </button>
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className="bg-indigo-800 text-white px-8 py-2 rounded-full flex items-center"
               >
                 Next
