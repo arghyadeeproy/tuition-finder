@@ -20,6 +20,14 @@ const UNIVERSITY_LIST = [
   "Others"
 ];
 
+// School Education Board options (enum mapping)
+const SCHOOL_EDUCATION_BOARD_OPTIONS = [
+  { value: 'cbse', label: 'CBSE' },
+  { value: 'icse', label: 'ICSE' },
+  { value: 'state', label: 'State Board' },
+  { value: 'other', label: 'Other' }
+];
+
 const PersonalDetailsForm = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -32,6 +40,7 @@ const PersonalDetailsForm = () => {
     otherQualification: '',
     subject_id: '',
     certificate: null,
+    school_education_board: '', // <-- Added for school_education_board
   });
 
   const [errors, setErrors] = useState({});
@@ -160,6 +169,11 @@ const PersonalDetailsForm = () => {
     if (!formData.universityName || !formData.universityName.trim()) {
       newErrors.universityName = 'University name is required';
     }
+
+    // School Education Board validation
+    if (!formData.school_education_board) {
+      newErrors.school_education_board = 'Please select your school education board';
+    }
     
     if (!formData.yearofPassing) {
       newErrors.yearofPassing = 'Year of passing is required';
@@ -218,6 +232,13 @@ const PersonalDetailsForm = () => {
       setErrors(prev => ({
         ...prev,
         universityName: ''
+      }));
+    }
+    // If user starts typing in school_education_board, clear error
+    if (name === "school_education_board" && errors.school_education_board) {
+      setErrors(prev => ({
+        ...prev,
+        school_education_board: ''
       }));
     }
   };
@@ -281,61 +302,74 @@ const PersonalDetailsForm = () => {
     setShowSubjectDropdown(false);
   };
 
-  const handleNext = async () => {
-    if (validateForm()) {
-      setIsSubmitting(true);
+// Updated handleNext function in PersonalDetailsForm.jsx
+
+const handleNext = async () => {
+  if (validateForm()) {
+    setIsSubmitting(true);
+    
+    try {
+      // Get teacher ID from localStorage
+      const teacherId = localStorage.getItem('teacher_id');
       
-      try {
-        // Get teacher ID from localStorage
-        const teacherId = localStorage.getItem('teacher_id');
-        
-        if (!teacherId) {
-          setErrors({
-            general: "Teacher ID not found. Please complete personal details first."
-          });
-          setIsSubmitting(false);
-          return;
-        }
-        
-        // Get the degree ID and subject ID from the form values
-        let degreeId = formData.EducationalQualification;
-        let degreeName = '';
-        if (degreeId === OTHER_QUALIFICATION_VALUE) {
-          degreeId = null;
-          degreeName = formData.otherQualification.trim();
-        } else {
-          degreeId = parseInt(degreeId);
-        }
-        const subjectId = parseInt(formData.subject_id);
-        
-        // Format the qualification data
-        const qualificationData = {
-          degree_id: degreeId,
-          degree_name: degreeName,
-          subject_id: subjectId,
-          yearofPassing: educationalQualificationService.formatYearOfPassing(formData.yearofPassing),
-          schoolName: formData.schoolName,
-          collegeName: formData.collegeName,
-          universityName: formData.universityName
-        };
-        
-        // Submit the qualification
-        await educationalQualificationService.createTeacherQualification(
-          teacherId,
-          qualificationData
-        );
-        
-        // Navigate to the next page
-        navigate('/teachersubject');
-      } catch (error) {
+      if (!teacherId) {
         setErrors({
-          general: "Error submitting educational qualification. Please try again."
+          general: "Teacher ID not found. Please complete personal details first."
         });
-      } finally {
         setIsSubmitting(false);
+        return;
       }
+      
+      // Get the degree ID and subject ID from the form values
+      let degreeId = formData.EducationalQualification;
+      let degreeName = '';
+      if (degreeId === OTHER_QUALIFICATION_VALUE) {
+        degreeId = null;
+        degreeName = formData.otherQualification.trim();
+      } else {
+        degreeId = parseInt(degreeId);
+      }
+      const subjectId = parseInt(formData.subject_id);
+      
+      // Ensure year of passing is not empty
+      const yearOfPassing = formData.yearofPassing || new Date().toISOString().substr(0, 7); // Default to current month/year if empty
+      
+      console.log("Year of passing before sending to service:", yearOfPassing);
+      
+      // Format the qualification data
+      const qualificationData = {
+        degree_id: degreeId,
+        degree_name: degreeName,
+        subject_id: subjectId,
+        yearofPassing: yearOfPassing,
+        schoolName: formData.schoolName,
+        collegeName: formData.collegeName,
+        universityName: formData.universityName,
+        school_education_board: formData.school_education_board,
+      };
+      
+      console.log("Full qualification data:", qualificationData);
+      
+      // Submit the qualification
+      const response = await educationalQualificationService.createTeacherQualification(
+        teacherId,
+        qualificationData
+      );
+      
+      console.log("API response:", response);
+      
+      // Navigate to the next page
+      navigate('/teachersubject');
+    } catch (error) {
+      console.error("Error submitting qualification:", error);
+      setErrors({
+        general: "Error submitting educational qualification. Please try again."
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-  };
+  }
+};
 
   // Function to show a user-friendly error message when API fails
   const renderErrorState = () => (
@@ -490,6 +524,22 @@ const PersonalDetailsForm = () => {
                       ${errors.schoolName ? 'border-red-500' : 'border-gray-300'}`}
                   />
                   {errors.schoolName && <p className="mt-1 text-sm text-red-500">{errors.schoolName}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-black">School Education Board <span className="text-red-500">*</span></label>
+                  <select
+                    name="school_education_board"
+                    value={formData.school_education_board}
+                    onChange={handleInputChange}
+                    className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
+                      ${errors.school_education_board ? 'border-red-500' : 'border-gray-300'}`}
+                  >
+                    <option value="">Choose</option>
+                    {SCHOOL_EDUCATION_BOARD_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  {errors.school_education_board && <p className="mt-1 text-sm text-red-500">{errors.school_education_board}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-black">College Name <span className="text-red-500">*</span></label>

@@ -8,15 +8,6 @@ export default function TuitionFinderForm() {
   const fileInputRef = useRef(null);
   const qualificationInputRef = useRef(null);
 
-  // School Education Board options must match enum order: {cbse: 0, icse: 1, state: 2, other: 3}
-  // But for API, we will send string values
-  const schoolEducationBoardOptions = [
-    { label: "CBSE", value: "cbse" },
-    { label: "ICSE", value: "icse" },
-    { label: "State Board", value: "state" },
-    { label: "Other", value: "other" }
-  ];
-
   const [formData, setFormData] = useState({
     teachLocation: true,
     teachSchools: true,
@@ -29,13 +20,9 @@ export default function TuitionFinderForm() {
     teachOffline: true, // Default to offline
     selectedMediums: [],
     mark_sheet: null,
-    highest_qualification_certificate: null,
-    school_education_board: "cbse" // default to string
+    highest_qualification_certificate: null
+    // school_education_board removed
   });
-
-  // For custom board text and dropdown state
-  const [otherBoardInput, setOtherBoardInput] = useState("");
-  const [isOtherBoard, setIsOtherBoard] = useState(false);
 
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -102,44 +89,13 @@ export default function TuitionFinderForm() {
     };
   }, [dropdownOpen, mediumDropdownOpen]);
 
-  // Handle change for all fields except school_education_board
+  // Handle change for all fields
   const handleChange = (e) => {
     const { name, value } = e.target;
-
-    // Special handling for school_education_board
-    if (name === "school_education_board") {
-      // First check if value is empty, if so use default value
-      const boardValue = value === "" ? "cbse" : value;
-
-      // Check if the value is the "Other" option
-      if (boardValue === "other") {
-        setIsOtherBoard(true);
-        setOtherBoardInput("");
-      } else {
-        setIsOtherBoard(false);
-        setOtherBoardInput("");
-      }
-
-      // Update the state with the string value
-      setFormData({
-        ...formData,
-        school_education_board: boardValue
-      });
-
-      // Debug logging
-      console.log(`School board changed to: ${boardValue} (${typeof boardValue})`);
-    } else {
-      setFormData({
-        ...formData,
-        [name]: value,
-      });
-    }
-  };
-
-  // Handle custom board input
-  const handleOtherBoardInputChange = (e) => {
-    setOtherBoardInput(e.target.value);
-    // We keep the school_education_board value as "other" for the backend
+    setFormData({
+      ...formData,
+      [name]: value,
+    });
   };
 
   const handleFileChange = (e) => {
@@ -252,7 +208,6 @@ export default function TuitionFinderForm() {
 
     // Debug logging
     console.log("Form data before submission:", formData);
-    console.log("School Education Board value:", formData.school_education_board, typeof formData.school_education_board);
 
     // Validate form data before submission - all fields are mandatory
     if (formData.selectedSubjects.length === 0) {
@@ -290,22 +245,6 @@ export default function TuitionFinderForm() {
       return;
     }
 
-    // Validate school_education_board
-    const boardValue = typeof formData.school_education_board === 'string' && formData.school_education_board
-      ? formData.school_education_board
-      : null;
-
-    if (boardValue === null) {
-      setSubmitError("Please select your School Education Board");
-      return;
-    }
-
-    // For "Other", ensure the user has entered a value
-    if (boardValue === "other" && !otherBoardInput.trim()) {
-      setSubmitError("Please specify your Board type");
-      return;
-    }
-
     // Prepare the data for teacher_preferences API submission
     const teacherId = localStorage.getItem('teacher_id');
 
@@ -314,7 +253,7 @@ export default function TuitionFinderForm() {
       return;
     }
 
-    // Create the request object with validated school_education_board (as string)
+    // Create the request object
     const teacherPreferenceRequest = {
       teaching_radius_km: parseInt(formData.radius) || 10,
       preferred_teaching_type: "individual",
@@ -326,15 +265,9 @@ export default function TuitionFinderForm() {
       special_attention_children: formData.teachSpecialChild,
       subject_ids: formData.selectedSubjects.map(id => parseInt(id)),
       preferred_medium: getPreferredMedium(formData.selectedMediums),
-      school_education_board: boardValue,
       ...(formData.mark_sheet !== undefined ? { mark_sheet: formData.mark_sheet } : {}),
       ...(formData.highest_qualification_certificate !== undefined ? { highest_qualification_certificate: formData.highest_qualification_certificate } : {})
     };
-
-    // Add the other board text if applicable
-    if (boardValue === "other" && otherBoardInput.trim() !== "") {
-      teacherPreferenceRequest.school_education_board_other = otherBoardInput.trim();
-    }
 
     try {
       console.log("Submitting request:", JSON.stringify(teacherPreferenceRequest, null, 2));
@@ -527,40 +460,6 @@ export default function TuitionFinderForm() {
                       Click to open dropdown and select multiple mediums
                     </p>
                   </div>
-                </div>
-
-                {/* School Education Board Dropdown */}
-                <div className="mt-6">
-                  <label className="text-sm text-black block mb-2">
-                    School Education Board <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="school_education_board"
-                    value={formData.school_education_board}
-                    onChange={handleChange}
-                    required
-                    className="w-full border border-gray-300 rounded p-2 text-black bg-white"
-                  >
-                    <option value="">Select Board</option>
-                    {schoolEducationBoardOptions.map((board) => (
-                      <option key={board.value} value={board.value}>{board.label}</option>
-                    ))}
-                  </select>
-                  {/* Show additional input field if "Other" is selected */}
-                  {isOtherBoard && (
-                    <div className="mt-2">
-                      <input
-                        type="text"
-                        value={otherBoardInput}
-                        onChange={handleOtherBoardInputChange}
-                        placeholder="Please specify your board"
-                        className="w-full border border-gray-300 rounded p-2 text-black"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Note: We'll record your board as "Other" in our system.
-                      </p>
-                    </div>
-                  )}
                 </div>
 
                 {/* Special Needs Teaching */}
