@@ -7,6 +7,15 @@ export default function TuitionFinderForm() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const qualificationInputRef = useRef(null);
+
+  // School Education Board options must match enum order: {cbse: 0, icse: 1, state: 2, other: 3}
+  const schoolEducationBoardOptions = [
+    { label: "CBSE", value: 0 },
+    { label: "ICSE", value: 1 },
+    { label: "State Board", value: 2 },
+    { label: "Other", value: 3 }
+  ];
+
   const [formData, setFormData] = useState({
     teachLocation: true,
     teachSchools: true,
@@ -18,9 +27,14 @@ export default function TuitionFinderForm() {
     teachOnline: false, // Disabled online teaching
     teachOffline: true, // Default to offline
     selectedMediums: [],
-    mark_sheet: null, // Use undefined instead of null
-    highest_qualification_certificate: null // New field
+    mark_sheet: null,
+    highest_qualification_certificate: null,
+    school_education_board: 0 // Default to CBSE (0) - Changed from empty string to number
   });
+
+  // For custom board text and dropdown state
+  const [otherBoardInput, setOtherBoardInput] = useState("");
+  const [isOtherBoard, setIsOtherBoard] = useState(false);
 
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -71,7 +85,7 @@ export default function TuitionFinderForm() {
   }, []);
 
   useEffect(() => {
-    // Close dropdown when clicking outside
+    // Close dropdowns when clicking outside
     const handleClickOutside = (event) => {
       if (dropdownOpen && !event.target.closest('.subject-dropdown')) {
         setDropdownOpen(false);
@@ -87,12 +101,44 @@ export default function TuitionFinderForm() {
     };
   }, [dropdownOpen, mediumDropdownOpen]);
 
+  // Handle change for all fields except school_education_board
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
+
+    // Special handling for school_education_board
+    if (name === "school_education_board") {
+      // First check if value is empty, if so use default value
+      const boardValue = value === "" ? 0 : parseInt(value, 10);
+      
+      // Check if the value is the "Other" option
+      if (boardValue === 3) {
+        setIsOtherBoard(true);
+        setOtherBoardInput("");
+      } else {
+        setIsOtherBoard(false);
+        setOtherBoardInput("");
+      }
+      
+      // Update the state with the parsed integer value
+      setFormData({
+        ...formData,
+        school_education_board: boardValue
+      });
+      
+      // Debug logging
+      console.log(`School board changed to: ${boardValue} (${typeof boardValue})`);
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value,
+      });
+    }
+  };
+
+  // Handle custom board input
+  const handleOtherBoardInputChange = (e) => {
+    setOtherBoardInput(e.target.value);
+    // We keep the school_education_board value as 3 ("other") for the backend
   };
 
   const handleFileChange = (e) => {
@@ -168,11 +214,9 @@ export default function TuitionFinderForm() {
 
   // Helper function to convert UI medium selection to API format
   const getPreferredMedium = (mediums) => {
-    // mediums is now an array of strings
     if (!Array.isArray(mediums) || mediums.length === 0) {
       return ["english"];
     }
-    // Lowercase and deduplicate
     return Array.from(new Set(mediums.map(m => m.toLowerCase())));
   };
 
@@ -204,6 +248,10 @@ export default function TuitionFinderForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitError(null);
+
+    // Debug logging
+    console.log("Form data before submission:", formData);
+    console.log("School Education Board value:", formData.school_education_board, typeof formData.school_education_board);
 
     // Validate form data before submission - all fields are mandatory
     if (formData.selectedSubjects.length === 0) {
@@ -241,6 +289,22 @@ export default function TuitionFinderForm() {
       return;
     }
 
+    // Validate school_education_board
+    const boardValue = typeof formData.school_education_board === 'number' && !isNaN(formData.school_education_board)
+      ? formData.school_education_board 
+      : null;
+      
+    if (boardValue === null) {
+      setSubmitError("Please select your School Education Board");
+      return;
+    }
+
+    // For "Other", ensure the user has entered a value
+    if (boardValue === 3 && !otherBoardInput.trim()) {
+      setSubmitError("Please specify your Board type");
+      return;
+    }
+
     // Prepare the data for teacher_preferences API submission
     const teacherId = localStorage.getItem('teacher_id');
 
@@ -249,7 +313,7 @@ export default function TuitionFinderForm() {
       return;
     }
 
-    // Don't send mark_sheet or highest_qualification_certificate if not present (undefined), and don't send null
+    // Create the request object with validated school_education_board
     const teacherPreferenceRequest = {
       teaching_radius_km: parseInt(formData.radius) || 10,
       preferred_teaching_type: "individual",
@@ -261,9 +325,15 @@ export default function TuitionFinderForm() {
       special_attention_children: formData.teachSpecialChild,
       subject_ids: formData.selectedSubjects.map(id => parseInt(id)),
       preferred_medium: getPreferredMedium(formData.selectedMediums),
+      school_education_board: boardValue,
       ...(formData.mark_sheet !== undefined ? { mark_sheet: formData.mark_sheet } : {}),
       ...(formData.highest_qualification_certificate !== undefined ? { highest_qualification_certificate: formData.highest_qualification_certificate } : {})
     };
+
+    // Add the other board text if applicable
+    if (boardValue === 3 && otherBoardInput.trim() !== "") {
+      teacherPreferenceRequest.school_education_board_other = otherBoardInput.trim();
+    }
 
     try {
       console.log("Submitting request:", JSON.stringify(teacherPreferenceRequest, null, 2));
@@ -284,6 +354,7 @@ export default function TuitionFinderForm() {
   const handleBack = () => {
     navigate('/educational_details_teacher');
   };
+
 
   return (
     <div className="fixed inset-0 bg-indigo-50 flex flex-col overflow-hidden">
@@ -455,6 +526,40 @@ export default function TuitionFinderForm() {
                       Click to open dropdown and select multiple mediums
                     </p>
                   </div>
+                </div>
+
+                {/* School Education Board Dropdown */}
+                <div className="mt-6">
+                  <label className="text-sm text-black block mb-2">
+                    School Education Board <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="school_education_board"
+                    value={formData.school_education_board}
+                    onChange={handleChange}
+                    required
+                    className="w-full border border-gray-300 rounded p-2 text-black bg-white"
+                  >
+                    <option value="">Select Board</option>
+                    {schoolEducationBoardOptions.map((board) => (
+                      <option key={board.value} value={board.value}>{board.label}</option>
+                    ))}
+                  </select>
+                  {/* Show additional input field if "Other" is selected */}
+                  {isOtherBoard && (
+                    <div className="mt-2">
+                      <input
+                        type="text"
+                        value={otherBoardInput}
+                        onChange={handleOtherBoardInputChange}
+                        placeholder="Please specify your board"
+                        className="w-full border border-gray-300 rounded p-2 text-black"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Note: We'll record your board as "Other" in our system.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Special Needs Teaching */}

@@ -387,6 +387,13 @@ const CombinedAuthForm = () => {
                 </div>
               )}
               
+              {/* Technical issue contact info */}
+              <div className="text-center mb-4">
+                <p className="text-xs text-gray-500">
+                  For any technical issue contact us at <a href="mailto:tech.stareducators@gmail.com" className="text-indigo-600 underline">tech.stareducators@gmail.com</a>
+                </p>
+              </div>
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Email Input */}
                 <div className="space-y-1">

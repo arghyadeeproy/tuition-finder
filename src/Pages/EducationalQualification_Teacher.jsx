@@ -3,6 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { educationalQualificationService } from '../services/educationalQualificationService';
 import { subjectService } from '../services/api';
 
+// Hardcoded university list for dropdown
+const UNIVERSITY_LIST = [
+  "University of Calcutta",
+  "Jadavpur University",
+  "St. Xavier's University",
+  "Presidency University",
+  "University of Burdwan",
+  "Vidyasagar University",
+  "Maulana Abul Kalam Azad University of Technology (MAKAUT)",
+  "University of Kalyani",
+  "Barasat Government College",
+  "West Bengal State University",
+  "Indira Gandhi National Open University (IGNOU)",
+  "Aliah University",
+  "Others"
+];
+
 const PersonalDetailsForm = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -26,8 +43,13 @@ const PersonalDetailsForm = () => {
   const [filteredSubjects, setFilteredSubjects] = useState([]);
   const [showSubjectDropdown, setShowSubjectDropdown] = useState(false);
 
+  // University field state
+  const [showUniversityTextBox, setShowUniversityTextBox] = useState(false);
+  const [showUniversityDropdownButton, setShowUniversityDropdownButton] = useState(false);
+
   // Add a constant for the "Other" value
   const OTHER_QUALIFICATION_VALUE = 'other';
+  const OTHER_UNIVERSITY_VALUE = 'Other';
 
   // Fetch subjects and degrees on component mount
   useEffect(() => {
@@ -97,6 +119,22 @@ const PersonalDetailsForm = () => {
     }
   }, [subjectSearch, subjects]);
 
+  // Handle universityName field for dropdown/textbox logic
+  useEffect(() => {
+    // If user selects "Other" from dropdown, show textbox
+    if (formData.universityName === OTHER_UNIVERSITY_VALUE) {
+      setShowUniversityTextBox(true);
+      setShowUniversityDropdownButton(false);
+      setFormData(prev => ({
+        ...prev,
+        universityName: ''
+      }));
+    } else {
+      setShowUniversityTextBox(false);
+      setShowUniversityDropdownButton(false);
+    }
+  }, [formData.universityName]);
+
   const validateForm = () => {
     const newErrors = {};
     
@@ -118,7 +156,8 @@ const PersonalDetailsForm = () => {
       newErrors.collegeName = 'College name is required';
     }
 
-    if (!formData.universityName) {
+    // University validation
+    if (!formData.universityName || !formData.universityName.trim()) {
       newErrors.universityName = 'University name is required';
     }
     
@@ -155,6 +194,10 @@ const PersonalDetailsForm = () => {
           otherQualification: ''
         }));
       }
+      // If user changes universityName dropdown and selects "Other", handled in useEffect
+      if (name === "universityName" && value === OTHER_UNIVERSITY_VALUE) {
+        // handled in useEffect
+      }
     }
     
     if (errors[name]) {
@@ -168,6 +211,63 @@ const PersonalDetailsForm = () => {
       setErrors(prev => ({
         ...prev,
         otherQualification: ''
+      }));
+    }
+    // If user starts typing in universityName, clear error
+    if (name === "universityName" && errors.universityName) {
+      setErrors(prev => ({
+        ...prev,
+        universityName: ''
+      }));
+    }
+  };
+
+  // Handler for university textbox value
+  const handleUniversityTextBoxChange = (e) => {
+    setFormData(prev => ({
+      ...prev,
+      universityName: e.target.value
+    }));
+    if (errors.universityName) {
+      setErrors(prev => ({
+        ...prev,
+        universityName: ''
+      }));
+    }
+  };
+
+  // Handler for "Show Dropdown" button in university textbox
+  const handleShowUniversityDropdownButton = () => {
+    setShowUniversityDropdownButton(true);
+    setShowUniversityTextBox(false);
+    setFormData(prev => ({
+      ...prev,
+      universityName: ''
+    }));
+  };
+
+  // Handler for selecting university from dropdown (when using the button)
+  const handleUniversityDropdownSelect = (e) => {
+    const value = e.target.value;
+    if (value === OTHER_UNIVERSITY_VALUE) {
+      setShowUniversityTextBox(true);
+      setShowUniversityDropdownButton(false);
+      setFormData(prev => ({
+        ...prev,
+        universityName: ''
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        universityName: value
+      }));
+      setShowUniversityDropdownButton(false);
+      setShowUniversityTextBox(false);
+    }
+    if (errors.universityName) {
+      setErrors(prev => ({
+        ...prev,
+        universityName: ''
       }));
     }
   };
@@ -406,15 +506,55 @@ const PersonalDetailsForm = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-black">University Name <span className="text-red-500">*</span></label>
-                  <input
-                    type="text"
-                    name="universityName"
-                    value={formData.universityName}
-                    onChange={handleInputChange}
-                    placeholder="Enter University Name"
-                    className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
-                      ${errors.universityName ? 'border-red-500' : 'border-gray-300'}`}
-                  />
+                  {/* University Dropdown or Textbox logic */}
+                  {!showUniversityTextBox && !showUniversityDropdownButton && (
+                    <select
+                      name="universityName"
+                      value={formData.universityName}
+                      onChange={handleInputChange}
+                      className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
+                        ${errors.universityName ? 'border-red-500' : 'border-gray-300'}`}
+                    >
+                      <option value="">Choose</option>
+                      {UNIVERSITY_LIST.map((uni, idx) => (
+                        <option key={uni} value={uni}>{uni}</option>
+                      ))}
+                    </select>
+                  )}
+                  {showUniversityTextBox && (
+                    <div className="flex gap-2 mt-1">
+                      <input
+                        type="text"
+                        name="universityName"
+                        value={formData.universityName}
+                        onChange={handleUniversityTextBoxChange}
+                        placeholder="Enter University Name"
+                        className={`block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
+                          ${errors.universityName ? 'border-red-500' : 'border-gray-300'}`}
+                      />
+                      <button
+                        type="button"
+                        className="px-3 py-2 bg-gray-200 rounded-md hover:bg-gray-300 text-black whitespace-nowrap"
+                        onClick={handleShowUniversityDropdownButton}
+                      >
+                        Show Dropdown
+                      </button>
+                    </div>
+                  )}
+                  {showUniversityDropdownButton && (
+                    <select
+                      name="universityName"
+                      value={formData.universityName}
+                      onChange={handleUniversityDropdownSelect}
+                      className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
+                        ${errors.universityName ? 'border-red-500' : 'border-gray-300'}`}
+                    >
+                      <option value="">Choose</option>
+                      {UNIVERSITY_LIST.map((uni, idx) => (
+                        <option key={uni} value={uni}>{uni}</option>
+                      ))}
+                    </select>
+                  )}
                   {errors.universityName && <p className="mt-1 text-sm text-red-500">{errors.universityName}</p>}
                 </div>
                 <div>
