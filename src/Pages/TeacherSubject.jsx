@@ -6,6 +6,7 @@ import { teacherService } from "../services/teacherService";
 export default function TuitionFinderForm() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  const qualificationInputRef = useRef(null);
   const [formData, setFormData] = useState({
     teachLocation: true,
     teachSchools: true,
@@ -17,7 +18,8 @@ export default function TuitionFinderForm() {
     teachOnline: false, // Disabled online teaching
     teachOffline: true, // Default to offline
     selectedMediums: [],
-    mark_sheet: null // Use undefined instead of null
+    mark_sheet: null, // Use undefined instead of null
+    highest_qualification_certificate: null // New field
   });
 
   const [subjects, setSubjects] = useState([]);
@@ -27,6 +29,7 @@ export default function TuitionFinderForm() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mediumDropdownOpen, setMediumDropdownOpen] = useState(false);
   const [fileError, setFileError] = useState(null);
+  const [qualificationFileError, setQualificationFileError] = useState(null);
 
   // Teaching medium options
   const teachingMediumOptions = [
@@ -117,6 +120,32 @@ export default function TuitionFinderForm() {
     }
   };
 
+  // New: handle qualification certificate file
+  const handleQualificationFileChange = (e) => {
+    setQualificationFileError(null);
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+
+      // Check file type
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+      if (!validTypes.includes(file.type)) {
+        setQualificationFileError('Please upload only JPG, JPEG or PNG files');
+        return;
+      }
+
+      // Check file size (500KB = 512000 bytes)
+      if (file.size > 512000) {
+        setQualificationFileError('File size must be less than 500KB');
+        return;
+      }
+
+      setFormData({
+        ...formData,
+        highest_qualification_certificate: file
+      });
+    }
+  };
+
   const handleRadioChange = (name, value) => {
     setFormData({
       ...formData,
@@ -192,6 +221,11 @@ export default function TuitionFinderForm() {
       return;
     }
 
+    if (!formData.highest_qualification_certificate) {
+      setSubmitError("Please upload your Highest Qualification Certificate");
+      return;
+    }
+
     if (!formData.radius || formData.radius === "0") {
       setSubmitError("Please specify a valid teaching radius");
       return;
@@ -215,7 +249,7 @@ export default function TuitionFinderForm() {
       return;
     }
 
-    // Don't send mark_sheet if not present (undefined), and don't send null
+    // Don't send mark_sheet or highest_qualification_certificate if not present (undefined), and don't send null
     const teacherPreferenceRequest = {
       teaching_radius_km: parseInt(formData.radius) || 10,
       preferred_teaching_type: "individual",
@@ -227,7 +261,8 @@ export default function TuitionFinderForm() {
       special_attention_children: formData.teachSpecialChild,
       subject_ids: formData.selectedSubjects.map(id => parseInt(id)),
       preferred_medium: getPreferredMedium(formData.selectedMediums),
-      ...(formData.mark_sheet !== undefined ? { mark_sheet: formData.mark_sheet } : {})
+      ...(formData.mark_sheet !== undefined ? { mark_sheet: formData.mark_sheet } : {}),
+      ...(formData.highest_qualification_certificate !== undefined ? { highest_qualification_certificate: formData.highest_qualification_certificate } : {})
     };
 
     try {
@@ -640,6 +675,43 @@ export default function TuitionFinderForm() {
                 {formData.mark_sheet && !fileError && (
                   <div className="text-sm text-green-600 mt-1">
                     File selected: {formData.mark_sheet.name}
+                  </div>
+                )}
+                <div className="text-xs text-gray-500 mt-1">
+                  Only JPG, JPEG or PNG files under 500KB are accepted
+                </div>
+
+                {/* Highest Qualification Certificate Upload */}
+                <div className="mt-6 flex items-center justify-between">
+                  <p className="text-sm text-black">Attach Highest Qualification Certificate <span className="text-red-500">*</span></p>
+                  <input
+                    type="file"
+                    ref={qualificationInputRef}
+                    onChange={handleQualificationFileChange}
+                    accept=".jpg,.jpeg,.png"
+                    className="hidden"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="bg-indigo-800 text-white px-4 py-2 rounded-md flex items-center"
+                    onClick={() => qualificationInputRef.current.click()}
+                  >
+                    <svg className="w-4 h-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm0-2a6 6 0 100-12 6 6 0 000 12z" clipRule="evenodd" />
+                    </svg>
+                    Upload Certificate
+                  </button>
+                </div>
+                {qualificationFileError && (
+                  <div className="text-sm text-red-600 mt-1">
+                    {qualificationFileError}
+                  </div>
+                )}
+                {formData.highest_qualification_certificate && !qualificationFileError && (
+                  <div className="text-sm text-green-600 mt-1">
+                    File selected: {formData.highest_qualification_certificate.name}
                   </div>
                 )}
                 <div className="text-xs text-gray-500 mt-1">
