@@ -9,11 +9,12 @@ export default function TuitionFinderForm() {
   const qualificationInputRef = useRef(null);
 
   // School Education Board options must match enum order: {cbse: 0, icse: 1, state: 2, other: 3}
+  // But for API, we will send string values
   const schoolEducationBoardOptions = [
-    { label: "CBSE", value: 0 },
-    { label: "ICSE", value: 1 },
-    { label: "State Board", value: 2 },
-    { label: "Other", value: 3 }
+    { label: "CBSE", value: "cbse" },
+    { label: "ICSE", value: "icse" },
+    { label: "State Board", value: "state" },
+    { label: "Other", value: "other" }
   ];
 
   const [formData, setFormData] = useState({
@@ -29,7 +30,7 @@ export default function TuitionFinderForm() {
     selectedMediums: [],
     mark_sheet: null,
     highest_qualification_certificate: null,
-    school_education_board: 0 // Default to CBSE (0) - Changed from empty string to number
+    school_education_board: "cbse" // default to string
   });
 
   // For custom board text and dropdown state
@@ -108,23 +109,23 @@ export default function TuitionFinderForm() {
     // Special handling for school_education_board
     if (name === "school_education_board") {
       // First check if value is empty, if so use default value
-      const boardValue = value === "" ? 0 : parseInt(value, 10);
-      
+      const boardValue = value === "" ? "cbse" : value;
+
       // Check if the value is the "Other" option
-      if (boardValue === 3) {
+      if (boardValue === "other") {
         setIsOtherBoard(true);
         setOtherBoardInput("");
       } else {
         setIsOtherBoard(false);
         setOtherBoardInput("");
       }
-      
-      // Update the state with the parsed integer value
+
+      // Update the state with the string value
       setFormData({
         ...formData,
         school_education_board: boardValue
       });
-      
+
       // Debug logging
       console.log(`School board changed to: ${boardValue} (${typeof boardValue})`);
     } else {
@@ -138,7 +139,7 @@ export default function TuitionFinderForm() {
   // Handle custom board input
   const handleOtherBoardInputChange = (e) => {
     setOtherBoardInput(e.target.value);
-    // We keep the school_education_board value as 3 ("other") for the backend
+    // We keep the school_education_board value as "other" for the backend
   };
 
   const handleFileChange = (e) => {
@@ -290,17 +291,17 @@ export default function TuitionFinderForm() {
     }
 
     // Validate school_education_board
-    const boardValue = typeof formData.school_education_board === 'number' && !isNaN(formData.school_education_board)
-      ? formData.school_education_board 
+    const boardValue = typeof formData.school_education_board === 'string' && formData.school_education_board
+      ? formData.school_education_board
       : null;
-      
+
     if (boardValue === null) {
       setSubmitError("Please select your School Education Board");
       return;
     }
 
     // For "Other", ensure the user has entered a value
-    if (boardValue === 3 && !otherBoardInput.trim()) {
+    if (boardValue === "other" && !otherBoardInput.trim()) {
       setSubmitError("Please specify your Board type");
       return;
     }
@@ -313,7 +314,7 @@ export default function TuitionFinderForm() {
       return;
     }
 
-    // Create the request object with validated school_education_board
+    // Create the request object with validated school_education_board (as string)
     const teacherPreferenceRequest = {
       teaching_radius_km: parseInt(formData.radius) || 10,
       preferred_teaching_type: "individual",
@@ -331,7 +332,7 @@ export default function TuitionFinderForm() {
     };
 
     // Add the other board text if applicable
-    if (boardValue === 3 && otherBoardInput.trim() !== "") {
+    if (boardValue === "other" && otherBoardInput.trim() !== "") {
       teacherPreferenceRequest.school_education_board_other = otherBoardInput.trim();
     }
 
