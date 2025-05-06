@@ -178,10 +178,16 @@ const PersonalDetailsForm = () => {
     if (!formData.yearofPassing) {
       newErrors.yearofPassing = 'Year of passing is required';
     } else {
-      const passYear = new Date(formData.yearofPassing).getFullYear();
+      // Only allow 4-digit years, e.g., 2023, 2024
+      const year = parseInt(formData.yearofPassing, 10);
       const currentYear = new Date().getFullYear();
-      if (passYear > currentYear + 4) {
-        newErrors.yearofPassing = 'Year of passing cannot be more than 4 years in the future';
+      if (
+        isNaN(year) ||
+        formData.yearofPassing.length !== 4 ||
+        year < 1900 ||
+        year > currentYear + 4
+      ) {
+        newErrors.yearofPassing = 'Please enter a valid year (e.g., 2023, 2024). Year of passing cannot be more than 4 years in the future.';
       }
     }
     
@@ -239,6 +245,13 @@ const PersonalDetailsForm = () => {
       setErrors(prev => ({
         ...prev,
         school_education_board: ''
+      }));
+    }
+    // If user starts typing in yearofPassing, clear error
+    if (name === "yearofPassing" && errors.yearofPassing) {
+      setErrors(prev => ({
+        ...prev,
+        yearofPassing: ''
       }));
     }
   };
@@ -331,24 +344,31 @@ const handleNext = async () => {
       }
       const subjectId = parseInt(formData.subject_id);
       
-      // Ensure year of passing is not empty
-      const yearOfPassing = formData.yearofPassing || new Date().toISOString().substr(0, 7); // Default to current month/year if empty
+      // CRITICAL FIX: Force the year of passing to be a valid string value
+      // Make sure it's not empty and is a valid 4-digit year string
+      let yearOfPassing = formData.yearofPassing ? String(formData.yearofPassing).trim() : '';
       
-      console.log("Year of passing before sending to service:", yearOfPassing);
+      // If empty or invalid, use current year
+      if (!yearOfPassing || !/^\d{4}$/.test(yearOfPassing)) {
+        yearOfPassing = String(new Date().getFullYear());
+      }
       
-      // Format the qualification data
+      console.log("Final year of passing value:", yearOfPassing);
+      
+      // Format the qualification data with BOTH field names to ensure compatibility
       const qualificationData = {
         degree_id: degreeId,
         degree_name: degreeName,
         subject_id: subjectId,
-        yearofPassing: yearOfPassing,
+        yearofPassing: yearOfPassing, // camelCase version
+        year_of_passing: yearOfPassing, // snake_case version for backend
         schoolName: formData.schoolName,
         collegeName: formData.collegeName,
         universityName: formData.universityName,
         school_education_board: formData.school_education_board,
       };
       
-      console.log("Full qualification data:", qualificationData);
+      console.log("Full qualification data being sent:", qualificationData);
       
       // Submit the qualification
       const response = await educationalQualificationService.createTeacherQualification(
@@ -608,12 +628,16 @@ const handleNext = async () => {
                   {errors.universityName && <p className="mt-1 text-sm text-red-500">{errors.universityName}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-black">Year of Passing (MM-YYYY) <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium text-black">Year of Passing <span className="text-red-500">*</span></label>
                   <input
-                    type="month"
+                    type="text"
                     name="yearofPassing"
                     value={formData.yearofPassing}
                     onChange={handleInputChange}
+                    placeholder="e.g. 2023"
+                    maxLength={4}
+                    pattern="\d{4}"
+                    inputMode="numeric"
                     className={`mt-1 block w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-black
                       ${errors.yearofPassing ? 'border-red-500' : 'border-gray-300'}`}
                   />
